@@ -1,0 +1,56 @@
+# Arquivo .gitignore para um projeto C++/CMake
+
+# # Caches e configurações de IDEs e editores
+
+# Visual Studio Code
+.vscode/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.vcxproj.filters
+
+# CLion
+.idea/
+
+# # Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# # Pastas de Build e arquivos gerados
+# Ignora a pasta de build principal
+build/
+
+# Outros nomes comuns para pastas de build
+[Bb]in/
+[Oo]ut/
+[Ii]nstall/
+
+# # Arquivos compilados
+# Executáveis
+*.exe
+*.out
+*.app
+
+# Bibliotecas
+*.dll
+*.so
+*.a
+*.lib
+*.dylib
+
+# Arquivos objeto
+*.o
+*.obj
+
+# # Outros
+# Arquivos de Log
+*.log
+
+# Arquivos de configuração de usuário (ImGui)
+imgui.ini
+
+# Arquivos de backup de editores
+*~
+*.swp
