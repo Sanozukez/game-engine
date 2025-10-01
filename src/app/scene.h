@@ -26,7 +26,6 @@ namespace Engine {
 
 #include "./../../engine/render/camera/free_camera.h"
 #include "./../../engine/render/camera/orbit_camera.h"
-#include "./../../engine/core/config.h"
 
 namespace Engine { 
 

@@ -31,6 +31,12 @@ namespace Engine
 
             void moveTo(const glm::vec3 &destination);
 
+            void setMovementSpeed(float speed);
+            void setRotationSpeed(float degreesPerSecond);
+
+            void setCameraFocusHeight(float height);
+            glm::vec3 getCameraFocusPoint() const;
+
         private:
             float m_movementSpeed;
             float m_rotationSpeed;
@@ -40,6 +46,8 @@ namespace Engine
 
             // --- CORREÇÃO: Variável que faltava ser declarada ---
             bool m_isCameraOrbitModeActive = false;
+
+            float m_cameraFocusHeight = 1.0f;
         };
 
     } // namespace Game

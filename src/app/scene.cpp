@@ -7,6 +7,7 @@
 #include "./../../engine/render/shader.h"
 #include "./../../engine/core/log.h"
 #include "./../../engine/core/path_utils.h"
+#include "./../../engine/core/config_manager.h"
 #include "./../../engine/render/camera/free_camera.h"
 #include "./../../engine/render/camera/orbit_camera.h"
 #include "./../../engine/asset/obj_loader.h"
@@ -23,24 +24,26 @@
 #include <memory>
 #include <format>
 
-#include "./../../engine/core/config.h"
-
 namespace Engine
 {
 
     Scene::Scene()
-        : shader(nullptr), m_playerCharacter(nullptr), m_terrain(nullptr) // Inicializa o novo ponteiro
+        : shader(nullptr), m_playerCharacter(nullptr), m_terrain(nullptr)
     {
-        if (Engine::CAMERA_DEFAULT_IS_FREE)
+        // Pega o tipo de câmera do ConfigManager
+        auto &config = ConfigManager::Get();
+        std::string cameraType = config.getValue<std::string>("camera.default_type", "orbit");
+
+        if (cameraType == "free")
         {
             m_camera = std::make_unique<Engine::Camera::FreeCamera>();
         }
-        else
+        else // "orbit" ou qualquer outro valor se torna o padrão
         {
             m_camera = std::make_unique<Engine::Camera::OrbitCamera>();
         }
-        Engine::Log::Info(std::format("Engine::Scene::Scene() - Construtor chamado. Câmera inicial: {}",
-                                      Engine::CAMERA_DEFAULT_IS_FREE ? "FreeCamera" : "OrbitCamera"));
+
+        Engine::Log::Info(std::format("Engine::Scene::Scene() - Construtor chamado. Câmera inicial a partir do JSON: {}", cameraType));
     }
 
     Scene::~Scene()
@@ -89,8 +92,7 @@ namespace Engine
             Engine::Log::Error(std::format("Erro ao carregar GameObject do Terreno: {}", e.what()));
         }
 
-        // 2. GameObject do Personagem (Cubo Simulado)
-        // (Nenhuma mudança nesta seção)
+        // 2. GameObject do Personagem
         try
         {
             auto characterModel = Engine::Asset::GLTFLoader::loadGLTF("assets/models/character_placeholder.glb");
@@ -99,17 +101,18 @@ namespace Engine
                 auto characterObject = std::make_unique<Engine::Game::PlayerCharacter>(std::move(characterModel));
                 characterObject->name = "PlayerCharacter";
                 characterObject->setPosition(glm::vec3(0.0f, 0.9f, 0.0f));
+
+                auto &config = Engine::ConfigManager::Get();
+                characterObject->setCameraFocusHeight(config.getValue<float>("character.player.camera_focus_height", 1.0f));
+                Engine::Log::Info("Altura de foco da câmera configurada a partir do JSON.");
+                                
+                characterObject->setMovementSpeed(config.getValue<float>("character.player.movement_speed", 5.0f));
+                characterObject->setRotationSpeed(config.getValue<float>("character.player.rotation_speed_degrees", 75.0f));
+                Engine::Log::Info("Velocidades do PlayerCharacter configuradas a partir do arquivo JSON.");
+
                 m_playerCharacter = characterObject.get();
                 m_gameObjects.push_back(std::move(characterObject));
                 Engine::Log::Info("GameObject Personagem (cubo) carregado e adicionado à cena!");
-
-                if (!Engine::CAMERA_DEFAULT_IS_FREE && m_playerCharacter)
-                {
-                    m_camera->setTarget(m_playerCharacter->getPosition());
-                    m_camera->setYaw(m_playerCharacter->getRotationYaw());
-                    Engine::Log::Debug(std::format("OrbitCamera target set to PlayerCharacter at {}. Initial Yaw: {}.",
-                                                   glm::to_string(m_playerCharacter->getPosition()), m_playerCharacter->getRotationYaw()));
-                }
             }
             else
             {
@@ -124,9 +127,31 @@ namespace Engine
         glEnable(GL_DEPTH_TEST);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-        if (Engine::CAMERA_DEFAULT_IS_FREE)
+        // --- MUDANÇA AQUI (BLOCO DA CÂMERA) ---
+        // Agora verificamos o tipo da câmera dinamicamente.
+
+        // Se a câmera for uma OrbitCamera, configura o alvo e os limites.
+        if (auto *orbitCam = dynamic_cast<Engine::Camera::OrbitCamera *>(m_camera.get()))
         {
-            m_camera->setPosition(glm::vec3(25.0f, 15.0f, 25.0f));
+            if (m_playerCharacter)
+            {
+                orbitCam->setTarget(m_playerCharacter->getPosition());
+                orbitCam->setYaw(m_playerCharacter->getRotationYaw());
+
+                auto &config = Engine::ConfigManager::Get();
+                orbitCam->setDistanceLimits(
+                    config.getValue<float>("camera.orbit.min_distance", 2.0f),
+                    config.getValue<float>("camera.orbit.max_distance", 25.0f));
+                orbitCam->setPitchLimits(
+                    config.getValue<float>("camera.orbit.min_pitch_degrees", -20.0f),
+                    config.getValue<float>("camera.orbit.max_pitch_degrees", 85.0f));
+                Engine::Log::Info("Limites da OrbitCamera configurados a partir do arquivo JSON.");
+            }
+        }
+        // Se a câmera for uma FreeCamera, define sua posição inicial.
+        else if (auto *freeCam = dynamic_cast<Engine::Camera::FreeCamera *>(m_camera.get()))
+        {
+            freeCam->setPosition(glm::vec3(25.0f, 15.0f, 25.0f));
         }
 
         Engine::Log::Info(std::format("Camera posicionada em {}", glm::to_string(m_camera->getPosition())));

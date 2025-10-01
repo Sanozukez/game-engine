@@ -4,6 +4,7 @@
 #include "input.h"
 #include "scene.h"
 #include "./../../engine/core/log.h"
+#include "./../../engine/core/config_manager.h"
 #include "./../../engine/input/input_manager.h"
 #include "./../../engine/physics/raycaster.h"
 #include "./../../engine/game/player_character.h"
@@ -15,6 +16,7 @@
 #include <iostream>
 #include <format>
 
+
 App::App() : m_window(nullptr), m_renderer(nullptr), scene() {
     Engine::Log::Info("[App] Construtor chamado");
 }
@@ -24,13 +26,20 @@ App::~App() = default;
 void App::run() {
     Engine::Log::Info("[App] Iniciando aplicação");
 
+    if (!Engine::ConfigManager::Get().load("config/engine_settings.json")) {
+        Engine::Log::Critical("[App] Falha ao carregar configurações essenciais. Encerrando.");
+        return;
+    }
+
+    auto& config = Engine::ConfigManager::Get();
+
     Engine::WindowConfig winConfig;
-    winConfig.width = 1280;
-    winConfig.height = 720;
-    winConfig.title = "Game Engine MMORPG";
-    winConfig.resizable = false;
-    winConfig.maximized = false;
-    winConfig.fullscreen = false;
+    winConfig.width = config.getValue<int>("window.width", 1280);
+    winConfig.height = config.getValue<int>("window.height", 720);
+     winConfig.title = config.getValue<std::string>("window.title", "Default Title");
+    winConfig.resizable = config.getValue<bool>("window.resizable", false);
+    winConfig.fullscreen = config.getValue<bool>("window.fullscreen", false);
+    winConfig.maximized = false; // Geralmente não é uma config inicial
 
     try {
         m_window = std::make_unique<Engine::Window>(winConfig);
@@ -91,8 +100,18 @@ void App::run() {
             m_window->isMaximized() ? m_window->restore() : m_window->maximize();
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
+
+        // --- MUDANÇA AQUI ---
         if (inputManager.IsKeyPressed(GLFW_KEY_F10)) {
-            m_window->setResolutionAndMode(Engine::DEFAULT_WINDOW_WIDTH, Engine::DEFAULT_WINDOW_HEIGHT, !m_window->isFullscreen());
+            // Pega a instância do ConfigManager
+            auto& config = Engine::ConfigManager::Get();
+
+            // Busca a resolução padrão a partir do arquivo de configuração
+            int defaultWidth = config.getValue<int>("window.width", 1280);
+            int defaultHeight = config.getValue<int>("window.height", 720);
+
+            // Usa os valores do config para restaurar a resolução
+            m_window->setResolutionAndMode(defaultWidth, defaultHeight, !m_window->isFullscreen());
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
         

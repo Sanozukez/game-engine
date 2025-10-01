@@ -30,7 +30,9 @@ namespace Engine
 
         void OrbitCamera::setDistance(float distance)
         {
-            distance_ = glm::clamp(distance, 1.0f, 50.0f);
+            // --- MUDANÇA AQUI ---
+            // Usa as variáveis de membro para o clamp, em vez de valores fixos.
+            distance_ = glm::clamp(distance, m_minDistance, m_maxDistance);
             Engine::Log::Debug(std::format("OrbitCamera: Distância definida para {}", distance_));
         }
 
@@ -48,7 +50,6 @@ namespace Engine
                 m_lastMouseX = xpos;
                 m_lastMouseY = ypos;
                 m_firstMouse = false;
-                Engine::Log::Debug(std::format("OrbitCamera: First mouse movement handled. Initializing lastX: {}, lastY: {}", m_lastMouseX, m_lastMouseY));
                 return;
             }
 
@@ -63,8 +64,9 @@ namespace Engine
             yaw_ -= deltaX * sensitivity;
             pitch_ += deltaY * sensitivity;
 
-            // Limita o ângulo vertical (pitch) para evitar que a câmera vire de cabeça para baixo
-            pitch_ = glm::clamp(pitch_, -1.5f, 1.5f); // ~85 graus para cima e para baixo
+            // --- MUDANÇA AQUI ---
+            // Usa as variáveis de membro para o clamp do pitch.
+            pitch_ = glm::clamp(pitch_, m_minPitch, m_maxPitch);
 
             Engine::Log::Trace(std::format("OrbitCamera: Mouse moved (deltaX: {}, deltaY: {}). Pitch: {}, Yaw: {}.", deltaX, deltaY, pitch_, yaw_));
         }
@@ -89,6 +91,13 @@ namespace Engine
             float z = distance_ * cosf(pitch_) * cosf(yaw_);
 
             glm::vec3 cameraPos = target_ - glm::vec3(x, y, z);
+
+            // Impede que a câmera afunde no chão. 0.2f é uma pequena margem.
+            // Deverá ser trocado por uma lógica com colisão posterior
+            if (cameraPos.y < 0.05f) {
+                cameraPos.y = 0.05f;
+            }
+            
             return glm::lookAt(cameraPos, target_, glm::vec3(0, 1, 0));
         }
 
@@ -163,6 +172,23 @@ namespace Engine
         const glm::mat4 &OrbitCamera::getProjectionMatrix() const
         {
             return m_projectionMatrix;
+        }
+
+        void OrbitCamera::setDistanceLimits(float min, float max)
+        {
+            m_minDistance = min;
+            m_maxDistance = max;
+            // Garante que a distância atual respeite os novos limites
+            setDistance(distance_);
+        }
+
+        void OrbitCamera::setPitchLimits(float minDegrees, float maxDegrees)
+        {
+            // Converte os graus recebidos para radianos, que é a unidade interna da câmera.
+            m_minPitch = glm::radians(minDegrees);
+            m_maxPitch = glm::radians(maxDegrees);
+            // Garante que o pitch atual respeite os novos limites
+            pitch_ = glm::clamp(pitch_, m_minPitch, m_maxPitch);
         }
 
     } // namespace Camera

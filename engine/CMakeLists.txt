@@ -3,6 +3,14 @@
 
 add_library(engine STATIC)
 
+# --- NOVA LINHA ADICIONADA AQUI ---
+# Adiciona explicitamente o diretório de includes da biblioteca nlohmann/json ao nosso target.
+# A variável ${json_SOURCE_DIR} é criada automaticamente pelo FetchContent.
+# O PUBLIC garante que qualquer outro projeto que use a 'engine' também encontre o header.
+target_include_directories(engine PUBLIC
+    ${json_SOURCE_DIR}/include
+)
+
 # Adiciona subdiretórios.
 # A ordem aqui é importante para dependências de targets (ex: core antes de quem o usa).
 add_subdirectory(core)

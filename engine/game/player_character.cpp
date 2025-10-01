@@ -38,95 +38,93 @@ namespace Engine
             m_isCameraOrbitModeActive = true;
         }
 
-        void PlayerCharacter::update(float deltaTime, const Input::InputManager &inputManager, Scene &scene, Camera::ICamera &camera)
-        {
-            // --- 1. VERIFICAÇÃO DE SAÍDA DO ESTADO ESPECIAL ---
-            // Input de teclado (W/S) ou RMB cancela o modo pós-clique.
-            if (m_isCameraOrbitModeActive &&
-                (inputManager.IsKeyPressed(GLFW_KEY_W) ||
-                 inputManager.IsKeyPressed(GLFW_KEY_S) ||
-                 inputManager.IsRightMouseButtonPressed()))
-            {
-                m_isCameraOrbitModeActive = false;
-                m_isMovingToDestination = false;
-            }
+        // --- IMPLEMENTAÇÃO DOS SETTERS ---
+        void PlayerCharacter::setMovementSpeed(float speed) {
+            m_movementSpeed = speed;
+        }
 
-            // --- 2. LÓGICA DE MOVIMENTO DE CLIQUE ---
-            // --- LÓGICA DE MOVIMENTO ---
+        void PlayerCharacter::setRotationSpeed(float degreesPerSecond) {
+            m_rotationSpeed = degreesPerSecond;
+        }
+
+        void PlayerCharacter::setCameraFocusHeight(float height) {
+            m_cameraFocusHeight = height;
+        }
+
+        glm::vec3 PlayerCharacter::getCameraFocusPoint() const {
+            return m_position + glm::vec3(0.0f, m_cameraFocusHeight, 0.0f);
+        }
+
+        void PlayerCharacter::update(float deltaTime, const Input::InputManager &inputManager, Scene& scene, Camera::ICamera &camera)
+        {
+            // --- BLOCO 1: CANCELAMENTO DE ESTADO ---
+            // Ações de movimento pelo teclado (W,S,Q,E) têm prioridade máxima e cancelam tudo.
+            // Note que A e D não estão aqui, pois eles têm função de câmera no modo pós-clique.
+            if (inputManager.IsKeyPressed(GLFW_KEY_W) || inputManager.IsKeyPressed(GLFW_KEY_S) ||
+                inputManager.IsKeyPressed(GLFW_KEY_Q) || inputManager.IsKeyPressed(GLFW_KEY_E))
+            {
+                if (m_isMovingToDestination || m_isCameraOrbitModeActive)
+                {
+                    m_isMovingToDestination = false;
+                    m_isCameraOrbitModeActive = false;
+                }
+            }
+            
+            // --- BLOCO 2: LÓGICA DE MOVIMENTO FÍSICO ---
+            // Este bloco só é responsável por mover o personagem se ele tiver um destino.
             if (m_isMovingToDestination)
             {
                 glm::vec3 directionToTarget = m_targetDestination - m_position;
-
                 if (glm::length(directionToTarget) < 0.1f)
                 {
-                    m_isMovingToDestination = false;
+                    m_isMovingToDestination = false; // Chegou ao destino, para de mover.
                 }
                 else
                 {
-                    // O movimento continua usando o vetor de direção completo (3D)
+                    // Move o personagem
                     m_position += glm::normalize(directionToTarget) * m_movementSpeed * deltaTime;
-
-                    // --- CORREÇÃO DEFINITIVA DO "TOMBO" ---
-                    // 1. Para a ROTAÇÃO, usamos apenas a projeção horizontal da direção.
+                    // Rotaciona o personagem para olhar na direção do movimento
                     glm::vec3 horizontalDirection = glm::vec3(directionToTarget.x, 0.0f, directionToTarget.z);
-
-                    // 2. Só atualizamos a rotação se houver um movimento horizontal a ser feito.
                     if (glm::length(horizontalDirection) > 0.001f)
                     {
-                        // 3. Usamos atan2 para calcular o ângulo Yaw de forma estável.
                         float targetYaw = atan2(horizontalDirection.x, horizontalDirection.z);
-
-                        // 4. Criamos um quatérnion apenas com essa rotação em torno do eixo Y.
-                        // Isso garante que o personagem NUNCA vai tombar ou se inclinar.
                         m_rotation = glm::quat(glm::vec3(0.0f, targetYaw, 0.0f));
                     }
                 }
             }
 
-            // --- 3. LÓGICA DE INPUT DO TECLADO ---
+            // --- BLOCO 3: LÓGICA DE INPUT DO TECLADO/MOUSE ---
+            // Este bloco decide o que as teclas fazem com base no estado atual.
             if (m_isCameraOrbitModeActive)
             {
-                // ESTADO PÓS-CLIQUE: A/D sempre giram a câmera, personagem não é afetado.
-                // Esta lógica agora está separada do movimento, corrigindo o bug.
+                // ESTADO PÓS-CLIQUE: A/D giram a câmera. O personagem e seu movimento não são afetados.
+                // Pressionar RMB não faz nada aqui, pois a própria câmera já o processa para girar.
                 float rotationAmountDegrees = m_rotationSpeed * deltaTime;
-                if (inputManager.IsKeyPressed(GLFW_KEY_A))
-                    camera.setYaw(camera.getYaw() + rotationAmountDegrees);
-                if (inputManager.IsKeyPressed(GLFW_KEY_D))
-                    camera.setYaw(camera.getYaw() - rotationAmountDegrees);
+                if (inputManager.IsKeyPressed(GLFW_KEY_A)) camera.setYaw(camera.getYaw() + rotationAmountDegrees);
+                if (inputManager.IsKeyPressed(GLFW_KEY_D)) camera.setYaw(camera.getYaw() - rotationAmountDegrees);
             }
-            else
+            else 
             {
                 // ESTADO NORMAL: Controle total pelo teclado.
                 glm::vec3 cameraForwardHorizontal = camera.getForwardVector();
                 glm::vec3 cameraRightHorizontal = camera.getRightVector();
                 float velocity = m_movementSpeed * deltaTime;
 
-                if (inputManager.IsKeyPressed(GLFW_KEY_W))
-                    m_position += cameraForwardHorizontal * velocity;
-                if (inputManager.IsKeyPressed(GLFW_KEY_S))
-                    m_position -= cameraForwardHorizontal * velocity;
+                if (inputManager.IsKeyPressed(GLFW_KEY_W)) m_position += cameraForwardHorizontal * velocity;
+                if (inputManager.IsKeyPressed(GLFW_KEY_S)) m_position -= cameraForwardHorizontal * velocity;
 
-                if (inputManager.IsRightMouseButtonPressed())
-                {
-                    if (inputManager.IsKeyPressed(GLFW_KEY_A) || inputManager.IsKeyPressed(GLFW_KEY_Q))
-                        m_position -= cameraRightHorizontal * velocity;
-                    if (inputManager.IsKeyPressed(GLFW_KEY_D) || inputManager.IsKeyPressed(GLFW_KEY_E))
-                        m_position += cameraRightHorizontal * velocity;
-                }
-                else
-                {
-                    if (inputManager.IsKeyPressed(GLFW_KEY_Q))
-                        m_position -= cameraRightHorizontal * velocity;
-                    if (inputManager.IsKeyPressed(GLFW_KEY_E))
-                        m_position += cameraRightHorizontal * velocity;
-
+                if (inputManager.IsRightMouseButtonPressed()) {
+                    if (inputManager.IsKeyPressed(GLFW_KEY_A) || inputManager.IsKeyPressed(GLFW_KEY_Q)) m_position -= cameraRightHorizontal * velocity;
+                    if (inputManager.IsKeyPressed(GLFW_KEY_D) || inputManager.IsKeyPressed(GLFW_KEY_E)) m_position += cameraRightHorizontal * velocity;
+                } else {
+                    if (inputManager.IsKeyPressed(GLFW_KEY_Q)) m_position -= cameraRightHorizontal * velocity;
+                    if (inputManager.IsKeyPressed(GLFW_KEY_E)) m_position += cameraRightHorizontal * velocity;
+                    
                     float rotationAmountDegrees = m_rotationSpeed * deltaTime;
-                    if (inputManager.IsKeyPressed(GLFW_KEY_A))
-                        camera.setYaw(camera.getYaw() + rotationAmountDegrees);
-                    if (inputManager.IsKeyPressed(GLFW_KEY_D))
-                        camera.setYaw(camera.getYaw() - rotationAmountDegrees);
+                    if (inputManager.IsKeyPressed(GLFW_KEY_A)) camera.setYaw(camera.getYaw() + rotationAmountDegrees);
+                    if (inputManager.IsKeyPressed(GLFW_KEY_D)) camera.setYaw(camera.getYaw() - rotationAmountDegrees);
                 }
-
+                
                 setRotationEuler(0.0f, camera.getYaw(), 0.0f);
             }
 
@@ -171,7 +169,8 @@ namespace Engine
                 }
             } // --- CORREÇÃO: Fim do if (terrain && terrain->getModel()) ---
 
-            camera.setTarget(m_position);
+             camera.setTarget(getCameraFocusPoint());
+            
         } // --- Fim do void PlayerCharacter::update(...) ---
 
     } // namespace Game

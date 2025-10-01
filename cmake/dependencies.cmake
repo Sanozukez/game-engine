@@ -175,3 +175,11 @@ if (IMPORT_IMGUI)
             ${imgui_SOURCE_DIR}/backends
     )
 endif ()
+
+# JSON for modern C++
+FetchContent_Declare(
+    json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3 # Uma versão estável e popular
+)
+FetchContent_MakeAvailable(json)

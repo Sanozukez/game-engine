@@ -1,0 +1,25 @@
+{
+  "window": {
+    "title": "Game Engine MMORPG v0.1",
+    "width": 1280,
+    "height": 720,
+    "fullscreen": false,
+    "resizable": false
+  },
+  "camera": {
+    "default_type": "orbit",
+    "orbit": {
+      "min_distance": 3.0,
+      "max_distance": 13.0,
+      "min_pitch_degrees": -55.0,
+      "max_pitch_degrees": 15.0
+    }
+  },
+  "character": {
+    "player": {
+      "movement_speed": 5.5,
+      "rotation_speed_degrees": 80.0,
+      "camera_focus_height": 1.2
+    }
+  }
+}
