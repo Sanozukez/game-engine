@@ -1,0 +1,21 @@
+# engine/physics/CMakeLists.txt
+# Este arquivo é responsável por adicionar as fontes e os diretórios de inclusão
+# do módulo 'physics' ao target principal da engine.
+
+# Adiciona as fontes do módulo 'physics' ao target principal 'engine'.
+target_sources(engine
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/raycaster.cpp
+    PUBLIC # Headers que definem a interface pública deste módulo
+        ${CMAKE_CURRENT_SOURCE_DIR}/raycaster.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/intersection.h
+)
+
+# Adiciona o diretório 'physics' como um diretório de inclusão pública para o target 'engine'.
+# Isso permite que outros módulos (como 'app') incluam headers de 'physics' usando:
+# #include "engine/physics/raycaster.h"
+target_include_directories(engine
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        # $<INSTALL_INTERFACE:include/engine/physics> # Para instalações futuras do seu motor
+)

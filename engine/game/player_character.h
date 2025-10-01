@@ -1,29 +1,46 @@
 // engine/game/player_character.h
 #pragma once
 
-#include "game_object.h" // Herda de GameObject
-#include "./../../engine/input/input_manager.h" // Para Input::InputManager
+#include "game_object.h"
+#include "./../../engine/input/input_manager.h"
+#include "./../../engine/render/camera/icamera.h"
 
-namespace Engine {
-namespace Game {
+// Forward Declaration
+namespace Engine
+{
+    namespace Asset
+    {
+        class Model;
+    }
+    class Scene;
+}
 
-class PlayerCharacter : public GameObject {
-public:
-    PlayerCharacter();
-    PlayerCharacter(std::unique_ptr<Engine::Asset::Model> model);
-    virtual ~PlayerCharacter() = default; // Destrutor virtual
+namespace Engine
+{
+    namespace Game
+    {
 
-    // Sobrescrever o método update() do GameObject
-    void update(float deltaTime, const Input::InputManager& inputManager, const Camera::ICamera& camera) override;
+        class PlayerCharacter : public GameObject
+        {
+        public:
+            PlayerCharacter();
+            PlayerCharacter(std::unique_ptr<Engine::Asset::Model> model);
+            virtual ~PlayerCharacter() = default;
 
-private:
-    // Propriedades específicas do PlayerCharacter
-    float m_movementSpeed;
-    float m_rotationSpeed;
+            void update(float deltaTime, const Input::InputManager &inputManager, Scene &scene, Camera::ICamera &camera) override;
 
-    // Para controlar a altura no terreno (futuro)
-    // float m_targetHeight; 
-};
+            void moveTo(const glm::vec3 &destination);
 
-} // namespace Game
+        private:
+            float m_movementSpeed;
+            float m_rotationSpeed;
+
+            bool m_isMovingToDestination = false;
+            glm::vec3 m_targetDestination{0.0f};
+
+            // --- CORREÇÃO: Variável que faltava ser declarada ---
+            bool m_isCameraOrbitModeActive = false;
+        };
+
+    } // namespace Game
 } // namespace Engine

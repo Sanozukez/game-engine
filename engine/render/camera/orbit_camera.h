@@ -8,12 +8,12 @@ namespace Engine
 {
     namespace Camera
     {
-
         class OrbitCamera : public ICamera
         {
         public:
             OrbitCamera();
 
+            // Métodos sobrescritos existentes
             void setTarget(const glm::vec3 &target) override;
             void setPosition(const glm::vec3 &position) override;
             void processMouseMovement(double xpos, double ypos) override;
@@ -24,14 +24,16 @@ namespace Engine
             const glm::vec3 &getPosition() const override;
             glm::vec3 getForwardVector() const override;
             glm::vec3 getRightVector() const override;
-
             void resetMouseState() override;
             void setZoom(float zoom_value) override;
             void setYaw(float yaw_degrees) override;
-            // **** MUDANÇA CRUCIAL AQUI: Declarar getYaw ****
             float getYaw() const override;
 
-            // Métodos específicos da OrbitCamera (SEM 'override', pois não estão em ICamera)
+            // --- NOVOS MÉTODOS SOBRESCRITOS ---
+            void setProjectionMatrix(float fov_degrees, float aspectRatio, float nearPlane, float farPlane) override;
+            const glm::mat4 &getProjectionMatrix() const override;
+
+            // Métodos específicos da OrbitCamera
             void setDistance(float distance);
             void setRotation(float pitch, float yaw);
 
@@ -42,9 +44,12 @@ namespace Engine
             float yaw_;
             float m_zoom;
 
-            double m_lastMouseX = 0.0;
-            double m_lastMouseY = 0.0;
-            bool m_firstMouse = true;
+            double m_lastMouseX;
+            double m_lastMouseY;
+            bool m_firstMouse;
+
+            // --- NOVO MEMBRO ---
+            glm::mat4 m_projectionMatrix;
         };
 
     } // namespace Camera

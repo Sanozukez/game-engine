@@ -19,8 +19,10 @@
 Thumbs.db
 
 # # Pastas de Build e arquivos gerados
+# # Pasta de assets 3d
 # Ignora a pasta de build principal
 build/
+assets/
 
 # Outros nomes comuns para pastas de build
 [Bb]in/

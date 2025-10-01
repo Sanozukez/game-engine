@@ -21,3 +21,7 @@ Estrutura modular com CMake funcionando por pasta
 Quero continuar exatamente de onde parei. Te mostrarei os arquivos necessários e espero que continue com base nisso.
 
 Por favor, espere que eu mostre os arquivos antes de sugerir código.
+
+# Para o sistema de movimentação com base na altura do terreno precisaremos implementar
+
+Octree: Uma árvore que divide o espaço em 8 cubos (octantes) recursivamente. É conceitualmente mais simples de entender e implementar, e funciona extremamente bem para terrenos e mundos de jogos que são razoavelmente distribuídos.

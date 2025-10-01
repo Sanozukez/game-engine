@@ -6,10 +6,11 @@
 #include "./../../engine/input/input_manager.h"
 
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <format>
 
-#include <GLFW/glfw3.h>                           // Para códigos de tecla, se GameObject usar diretamente (apenas para PlayerCharacter agora)
-#include "./../../engine/render/camera/icamera.h" // Para CameraMovement enum (apenas para PlayerCharacter agora)
+#include <GLFW/glfw3.h>
+#include "./../../engine/render/camera/icamera.h"
 
 namespace Engine
 {
@@ -81,6 +82,10 @@ namespace Engine
 
         void GameObject::draw(const Render::Shader &shader) const
         {
+            // --- LOG DE DEBUG ADICIONADO ---
+            glm::mat4 modelMatrix = getTransformMatrix();
+            Engine::Log::Trace(std::format("GameObject::draw() - Desenhando '{}'. Matriz Model:\n{}", name, glm::to_string(modelMatrix)));
+            // --- FIM DO LOG ---
             if (m_model)
             {
                 shader.setMat4("uModel", getTransformMatrix());
@@ -92,11 +97,11 @@ namespace Engine
             }
         }
 
-        // **** MUDANÇA: Implementação padrão (vazia) do método update() ****
-        void GameObject::update(float deltaTime, const Input::InputManager &inputManager, const Camera::ICamera &camera)
-        { // MUDANÇA: Aceita camera
-            // Default implementation, typically does nothing.
-            // Derived classes will override this.
+        // --- MUDANÇA AQUI ---
+        // A definição da função 'update' também remove o 'const' do parâmetro da câmera.
+        void GameObject::update(float deltaTime, const Input::InputManager &inputManager, Scene &scene, Camera::ICamera &camera)
+        {
+            // A implementação padrão continua vazia.
         }
 
     } // namespace Game

@@ -1,7 +1,5 @@
 // engine/render/camera/free_camera.h
-
-#ifndef FREE_CAMERA_H
-#define FREE_CAMERA_H
+#pragma once // Substituído o #ifndef guard por #pragma once para consistência
 
 #include "icamera.h" 
 #include <glm/glm.hpp>
@@ -13,25 +11,25 @@ class FreeCamera : public ICamera {
 public:
     FreeCamera();
 
+    // Métodos existentes (sobrescritos)
     void setPosition(const glm::vec3& position) override;
     glm::mat4 getViewMatrix() const override;
-
     void processKeyboard(CameraMovement direction, float deltaTime) override;
     void processMouseMovement(double xpos, double ypos) override; 
     void processScroll(double yOffset) override; 
-
     float getZoom() const override; 
     const glm::vec3& getPosition() const override; 
     glm::vec3 getForwardVector() const override; 
     glm::vec3 getRightVector() const override;
-
     void resetMouseState() override; 
     void setTarget(const glm::vec3& target) override; 
     void setZoom(float zoom_value) override; 
     void setYaw(float yaw_degrees) override;
-    // **** NOVO: getYaw (Declarado corretamente aqui) ****
-    float getYaw() const override; 
+    float getYaw() const override;
 
+    // --- NOVOS MÉTODOS DA INTERFACE IMPLEMENTADOS ---
+    void setProjectionMatrix(float fov_degrees, float aspectRatio, float nearPlane, float farPlane) override;
+    const glm::mat4& getProjectionMatrix() const override;
 
 private:
     glm::vec3 position;
@@ -46,14 +44,15 @@ private:
     float sensitivity;
     float zoom; 
 
-    double m_lastMouseX = 0.0;
-    double m_lastMouseY = 0.0;
-    bool m_firstMouse = true;
+    double m_lastMouseX;
+    double m_lastMouseY;
+    bool m_firstMouse;
+
+    // --- NOVO MEMBRO ADICIONADO ---
+    glm::mat4 m_projectionMatrix;
 
     void updateVectors();
 };
 
 } // namespace Camera
 } // namespace Engine
-
-#endif

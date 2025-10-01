@@ -14,6 +14,7 @@ add_subdirectory(geometry)
 add_subdirectory(asset)
 add_subdirectory(deps)
 add_subdirectory(game)
+add_subdirectory(physics)
 
 # se todas as fontes .cpp estão sendo adicionadas pelos subdiretórios
 # (como engine/core/CMakeLists.txt e engine/input/CMakeLists.txt fazem).
