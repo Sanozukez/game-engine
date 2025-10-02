@@ -10,6 +10,8 @@
 #include "./../../engine/core/config_manager.h"
 #include "./../../engine/render/camera/free_camera.h"
 #include "./../../engine/render/camera/orbit_camera.h"
+#include "./../../engine/core/SceneLoader.h"
+#include "./../../shared/mmap_format/SceneFileFormat.h"
 #include "./../../engine/asset/obj_loader.h"
 #include "./../../engine/render/texture.h"
 #include "./../../engine/asset/gltf_loader.h"
@@ -65,31 +67,70 @@ namespace Engine
             return;
         }
 
-        // 1. GameObject do Terreno
-        try
+        // ====================================================================
+        // 1. NOVO FLUXO: CARREGAMENTO BINÁRIO (MMAP)
+        // ====================================================================
+        Engine::Log::Info("Engine::Scene::initialize() - Iniciando carregamento MMAP.");
+
+        Engine::SceneLoader sceneLoader;
+        // O nome do arquivo final do mapa é o que foi gerado pelo nosso compiler
+        bool loadSuccess = sceneLoader.loadMapBinary("assets/models/test_scene_1.mmap");
+
+        if (!loadSuccess)
         {
-            auto terrainModel = Engine::Asset::GLTFLoader::loadGLTF("assets/models/map_test.glb");
-            if (terrainModel)
-            {
-                auto terrainObject = std::make_unique<Engine::Game::GameObject>(std::move(terrainModel));
-                terrainObject->name = "Terrain";
-                terrainObject->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+            Engine::Log::Error("Falha crítica ao carregar arquivo de cena (.mmap).");
+            return;
+        }
 
-                // --- MUDANÇA AQUI ---
-                // Armazena um ponteiro bruto para o terreno para acesso rápido.
-                m_terrain = terrainObject.get();
+        // OBTENHA O VETOR DE NODES CARREGADOS
+        const auto &loaded_nodes = sceneLoader.nodes;
 
-                m_gameObjects.push_back(std::move(terrainObject));
-                Engine::Log::Info("GameObject Terreno carregado e adicionado à cena!");
-            }
-            else
+        // ====================================================================
+        // 1. LÓGICA DO TERRENO PRINCIPAL (Deve ser criado apenas UMA VEZ)
+        // ====================================================================
+        // Encontre o node que você designou como o Terreno Base (Ex: um node com a altura 0,0)
+
+        // Por enquanto, vamos usar o PRIMEIRO node STATIC_MESH encontrado como Terreno Base
+        const SceneNode *terrainNode = nullptr;
+        for (const auto &node : loaded_nodes)
+        {
+            if (node.type == EntityType::TYPE_STATIC_MESH)
             {
-                Engine::Log::Error("Falha ao criar GameObject do Terreno: Modelo nulo.");
+                terrainNode = &node;
+                break;
             }
         }
-        catch (const std::exception &e)
+
+        if (terrainNode)
         {
-            Engine::Log::Error(std::format("Erro ao carregar GameObject do Terreno: {}", e.what()));
+            // Carrega a geometria do Terreno UMA VEZ, usando a posição do primeiro node estático
+            auto terrainModel = Engine::Asset::GLTFLoader::loadGLTF("assets/models/test_scene_1.glb");
+            auto terrainObject = std::make_unique<Engine::Game::GameObject>(std::move(terrainModel));
+            terrainObject->setPosition(glm::vec3(terrainNode->position[0], terrainNode->position[1], terrainNode->position[2]));
+
+            m_terrain = terrainObject.get();
+            m_gameObjects.push_back(std::move(terrainObject));
+            Engine::Log::Info("GameObject Terreno BASE carregado via MMAP!");
+        }
+        else
+        {
+            Engine::Log::Error("Nenhum Node Estático encontrado para ser o Terreno Base.");
+        }
+
+        // ====================================================================
+        // 2. ITERAÇÃO PARA OUTROS OBJETOS (MOBILIÁRIO, INÍCIOS DE ARRAY, TRIGGERS)
+        // ====================================================================
+        for (const auto &node : loaded_nodes)
+        {
+            if (node.type == EntityType::TYPE_NPC)
+            {
+                // Lógica de spawn de NPC/MOB, ignorada por enquanto.
+            }
+            else if (node.type == EntityType::TYPE_STATIC_MESH && node.entity_id != terrainNode->entity_id)
+            {
+                // Lógica para instanciar outros objetos estáticos (ex: muros, pedras) que não são o Terreno Base
+                // Omitida por enquanto.
+            }
         }
 
         // 2. GameObject do Personagem
@@ -100,12 +141,12 @@ namespace Engine
             {
                 auto characterObject = std::make_unique<Engine::Game::PlayerCharacter>(std::move(characterModel));
                 characterObject->name = "PlayerCharacter";
-                characterObject->setPosition(glm::vec3(0.0f, 0.9f, 0.0f));
+                characterObject->setPosition(glm::vec3(0.0f, 0.9f, 0.0f)); // Posição fixa por enquanto
 
                 auto &config = Engine::ConfigManager::Get();
                 characterObject->setCameraFocusHeight(config.getValue<float>("character.player.camera_focus_height", 1.0f));
                 Engine::Log::Info("Altura de foco da câmera configurada a partir do JSON.");
-                                
+
                 characterObject->setMovementSpeed(config.getValue<float>("character.player.movement_speed", 5.0f));
                 characterObject->setRotationSpeed(config.getValue<float>("character.player.rotation_speed_degrees", 75.0f));
                 Engine::Log::Info("Velocidades do PlayerCharacter configuradas a partir do arquivo JSON.");

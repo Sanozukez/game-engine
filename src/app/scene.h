@@ -4,6 +4,8 @@
 #include <memory> 
 #include <vector>
 #include <glm/glm.hpp> 
+#include "./../../engine/core/SceneLoader.h"
+#include "./../../shared/mmap_format/SceneFileFormat.h"
 #include "./../../engine/render/camera/icamera.h" 
 #include "./../../engine/render/texture.h" 
 

@@ -17,6 +17,8 @@ game-engine/
 │    └── (imagens de textura .png ou .jpg e outras)
 ├── cmake/
 │ └── dependencies.cmake # Setup de dependências via FetchContent
+├── config/
+│ └── engine_settings.json # Configurações diversas de jogo (in-game)
 ├── engine/
 │ ├── asset/
 │ │ ├── CmakeLists.txt
@@ -30,7 +32,9 @@ game-engine/
 │ │ └── camera.h
 │ ├── core/     # Utilitários centrais (logs, config, helpers)
 │ │ ├── CmakeLists.txt
-│ │ ├── config.h
+│ │ ├── config.h (deprecated)
+│ │ ├── config_manager.h
+│ │ ├── config_manager.cpp
 │ │ ├── log.cpp
 │ │ ├── log.h
 │ │ ├── path_utils.cpp
