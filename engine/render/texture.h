@@ -24,6 +24,8 @@ public:
     Texture(const Texture&) = delete;
     Texture& operator=(const Texture&) = delete;
 
+    std::unique_ptr<Texture> clone() const;
+
     void bind(GLuint unit = 0) const; 
     void unbind() const;
 

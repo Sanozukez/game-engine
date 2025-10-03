@@ -14,6 +14,11 @@ include_directories(${PROJECT_ROOT_PATH}shared/mmap_format)
 # Presume-se que cgltf.h está diretamente em deps/cgltf/
 include_directories(${PROJECT_ROOT_PATH}engine/deps/cgltf)
 
+# 3. Headers do nlohmann/json (Herdado do FetchContent na raiz)
+# Caminho: ../../build/_deps/json-src/include (Ajuste o caminho se for diferente)
+# Assumimos que a pasta de build principal está na raiz (game-engine/build)
+include_directories(${PROJECT_ROOT_PATH}build/_deps/json-src/include)
+
 # Desativa warnings de funções inseguras do CRT do MSVC (para libs como cgltf)
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 

@@ -42,6 +42,9 @@ namespace Engine
             Mesh(std::vector<Vertex> &&vertices, std::vector<GLuint> &&indices, std::unique_ptr<Render::Material> material);
             ~Mesh();
 
+            // Construtor de Cópia para Clone de mesh
+            Mesh(const Mesh &other);
+
             void draw(const Render::Shader &shader) const;
 
             size_t getVertexCount() const { return m_vertices.size(); }
@@ -77,6 +80,10 @@ namespace Engine
             void draw(const Render::Shader &shader) const; // Desenha todas as meshes do modelo
 
             const std::vector<std::unique_ptr<Mesh>> &getMeshes() const { return m_meshes; }
+
+            // NOVO: Declaração da função clone para permitir a instanciação
+            // Retorna uma cópia profunda (deep copy) do Model como um ponteiro único.
+            std::unique_ptr<Model> clone() const;
 
         private:
             std::vector<std::unique_ptr<Mesh>> m_meshes;

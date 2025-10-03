@@ -151,6 +151,40 @@ Flexível para expansão: Pode adicionar novos módulos ou testes criando outras
 
  Separar lógica da GUI e lógica de renderização
 
+ # Comandos Rápidos
+
+ ### GIT
+
+ git status
+ git add .
+
+ git commit -m "descrição curta" -m "descrição longa"
+<!-- :emoji: <tipo>(escopo): <descrição> -->
+
+ git push
+
+
+Lista de tipo  
+fix <!-- bugfix -->
+feat <!-- novo recurso -->
+docs <!-- documentação -->
+refactor <!-- refatoração -->
+build <!-- alterações de revisão de código -->
+
+Lista de emoji  
+:bug: <!-- bugfix -->
+:sparkles: <!-- novo recurso -->
+:books: <!-- documentação -->
+:construction: <!-- em progresso -->
+:heavy_plus_sign: <!-- add dependencia -->
+:ok_hand: <!-- alterações de revisão de código -->
+:recycle: <!-- refatoração -->
+:truck: <!-- mover/renomear -->
+
+
+
+ ### Compile e Run
+
 
 cmake -B build
 cmake --build build

@@ -58,6 +58,12 @@ namespace Engine
             void activate(const Shader &shader) const;
             void deactivate() const;
 
+            Material(const Material &) = delete;
+            Material &operator=(const Material &) = delete;
+
+            // NOVO: Declaração do método clone()
+            std::unique_ptr<Material> clone() const;
+
         private:
             std::unique_ptr<Texture> m_baseColorMap;
             std::unique_ptr<Texture> m_normalMap;

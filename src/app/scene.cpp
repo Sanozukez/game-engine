@@ -25,6 +25,8 @@
 #include <iostream>
 #include <memory>
 #include <format>
+#include <map>
+#include <string>
 
 namespace Engine
 {
@@ -82,20 +84,16 @@ namespace Engine
             return;
         }
 
-        // OBTENHA O VETOR DE NODES CARREGADOS
         const auto &loaded_nodes = sceneLoader.nodes;
-
-        // ====================================================================
-        // 1. LÓGICA DO TERRENO PRINCIPAL (Deve ser criado apenas UMA VEZ)
-        // ====================================================================
-        // Encontre o node que você designou como o Terreno Base (Ex: um node com a altura 0,0)
-
-        // Por enquanto, vamos usar o PRIMEIRO node STATIC_MESH encontrado como Terreno Base
         const SceneNode *terrainNode = nullptr;
+
+        // ====================================================================
+        // 1. LÓGICA DO TERRENO PRINCIPAL (Procura o TYPE_TERRAIN_BASE)
+        // ====================================================================
         for (const auto &node : loaded_nodes)
         {
-            if (node.type == EntityType::TYPE_STATIC_MESH)
-            {
+            if (node.type == EntityType::TYPE_TERRAIN_BASE)
+            { // <-- NOVO FILTRO
                 terrainNode = &node;
                 break;
             }
@@ -110,6 +108,7 @@ namespace Engine
 
             m_terrain = terrainObject.get();
             m_gameObjects.push_back(std::move(terrainObject));
+
             Engine::Log::Info("GameObject Terreno BASE carregado via MMAP!");
         }
         else
@@ -118,19 +117,70 @@ namespace Engine
         }
 
         // ====================================================================
-        // 2. ITERAÇÃO PARA OUTROS OBJETOS (MOBILIÁRIO, INÍCIOS DE ARRAY, TRIGGERS)
+        // 2. ITERAÇÃO E INSTANCIAÇÃO DOS OBJETOS SECUNDÁRIOS
         // ====================================================================
-        for (const auto &node : loaded_nodes)
+
+        // NOVO: Cache de Assets (Simula um Asset Manager)
+        // Armazena Modelos já carregados (string: nome do GLB, unique_ptr: o modelo base)
+        std::map<std::string, std::shared_ptr<Engine::Asset::Model>> assetCache;
+
+        // --- LÓGICA DE INSTANCIAÇÃO (ARRAY E ESTÁTICOS) ---
+
+        for (const auto &node : sceneLoader.nodes)
         {
-            if (node.type == EntityType::TYPE_NPC)
+
+            // Ignoramos os nodes de controle (TERRAIN_BASE) e os originais ARRAY_START
+            if (node.type == EntityType::TYPE_TERRAIN_BASE || node.type == EntityType::TYPE_ARRAY_START)
             {
-                // Lógica de spawn de NPC/MOB, ignorada por enquanto.
+                continue;
             }
-            else if (node.type == EntityType::TYPE_STATIC_MESH && node.entity_id != terrainNode->entity_id)
+
+            // Se o node for do tipo STATIC_MESH (os 20 módulos gerados)
+            if (node.type == EntityType::TYPE_STATIC_MESH)
             {
-                // Lógica para instanciar outros objetos estáticos (ex: muros, pedras) que não são o Terreno Base
-                // Omitida por enquanto.
+
+                // 1. Otimização: Determinar qual Asset GLB carregar
+                // Buscamos o nome do asset (que foi codificado como 'wall_module_placeholder.glb' no compile-time)
+                // NOTA: Para o teste, hardcodaremos o nome do asset, pois ele não foi salvo no MMAP binário.
+                // No futuro, o AssetManager faria essa tradução via node.asset_reference_id.
+
+                std::string asset_name = "wall_module_placeholder.glb"; // <<-- Ainda hardcoded, mas será resolvido!
+
+                // 2. Otimização: Carregar o Asset Apenas uma Vez (Caching)
+                if (assetCache.find(asset_name) == assetCache.end())
+                {
+
+                    auto loadedModel = Engine::Asset::GLTFLoader::loadGLTF("assets/models/" + asset_name);
+
+                    if (loadedModel)
+                    {
+                        // Armazena no cache como shared_ptr, pois todos os objetos compartilharão esta geometria
+                        assetCache[asset_name] = std::shared_ptr<Engine::Asset::Model>(loadedModel.release());
+                        Engine::Log::Info("Asset Manager: Modelo de Muro carregado e armazenado no cache.");
+                    }
+                    else
+                    {
+                        Engine::Log::Error("Asset Manager: Falha ao carregar modelo de muro!");
+                        continue; // Pula a instanciação
+                    }
+                }
+
+                // 3. Instanciação: Cria o GameObject e define a posição
+                auto baseModel = assetCache[asset_name];
+
+                // Criar uma cópia profunda (Deep Copy) do modelo base para a nova instância
+                // NOTA: O método clone() deve ser chamado no objeto base do cache!
+                auto moduleModelCopy = baseModel->clone();
+
+                auto moduleObject = std::make_unique<Engine::Game::GameObject>(std::move(moduleModelCopy));
+
+                // Posição exata calculada pelo compiler
+                moduleObject->setPosition(glm::vec3(node.position[0], node.position[1], node.position[2]));
+
+                m_gameObjects.push_back(std::move(moduleObject));
             }
+
+            // ... (Lógica futura para NPCs e Triggers)
         }
 
         // 2. GameObject do Personagem
