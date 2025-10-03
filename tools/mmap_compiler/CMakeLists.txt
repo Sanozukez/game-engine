@@ -1,36 +1,49 @@
-# game-engine/tools/mmap_compiler/CMakeLists.txt
+# // game-engine/tools/mmap_compiler/CMakeLists.txt (Versão Final e Corrigida)
 
 cmake_minimum_required(VERSION 3.10)
 project(mmap_compiler C CXX)
 
-# O caminho é relativo a partir da pasta 'tools/mmap_compiler'
-# Sobe dois níveis (../../) para chegar na raiz 'game-engine'
-set(PROJECT_ROOT_PATH "../../")
+set(PROJECT_ROOT_PATH "../../") 
 
-# 1. Headers Compartilhados (Nossa nova API)
-include_directories(${PROJECT_ROOT_PATH}shared/mmap_format)
+# =========================================================================
+# 1. DEFINIÇÃO DOS ARQUIVOS DE CÓDIGO FONTE (CORRETO)
+# =========================================================================
 
-# 2. Headers do cgltf
-# Presume-se que cgltf.h está diretamente em deps/cgltf/
-include_directories(${PROJECT_ROOT_PATH}engine/deps/cgltf)
+set(MMAP_SOURCES
+    mmap_compiler.cpp
+    asset_processor.cpp
+    array_processor.cpp
+    mmap_writer.cpp
+)
 
-# 3. Headers do nlohmann/json (Herdado do FetchContent na raiz)
-# Caminho: ../../build/_deps/json-src/include (Ajuste o caminho se for diferente)
-# Assumimos que a pasta de build principal está na raiz (game-engine/build)
-include_directories(${PROJECT_ROOT_PATH}build/_deps/json-src/include)
+# 2. CONFIGURAÇÃO DE INCLUDES (Ajustado)
+# Adicionar a pasta atual para includes locais e APIs do compilador.
+include_directories(. 
+    ${PROJECT_ROOT_PATH}shared/mmap_format
+    ${PROJECT_ROOT_PATH}engine/deps/cgltf
+    ${PROJECT_ROOT_PATH}build/_deps/json-src/include
+)
 
-# Desativa warnings de funções inseguras do CRT do MSVC (para libs como cgltf)
+# 3. DEFINIÇÃO DO EXECUTÁVEL
+add_executable(mmap_compiler ${MMAP_SOURCES})
+
+# 4. DEPENDÊNCIAS DE LINKAGEM
+# Não linkamos o cgltf.a pois usamos a implementação header-only.
+# Não linkamos o nlohmann/json pois ele é header-only.
+# Mas precisamos que o CMake saiba que essas bibliotecas existem e devem ser resolvidas.
+
+# (REMOVIDO: target_link_libraries, pois o executável é autocontido e não precisa de linkage externo)
+
+# 5. FLAGS E OTIMIZAÇÕES
+
+# Desativa warnings de funções inseguras do CRT do MSVC
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
-# Adiciona o arquivo fonte do executável
-add_executable(mmap_compiler mmap_compiler.cpp)
-
-# Define as opções de compilação (necessário para o pragma pack(1) funcionar corretamente)
+# Define as opções de compilação
 if(MSVC)
-    # Define as flags de C++ e C separadamente
+    # Garante que as opções CXX e C sejam aplicadas para todos os arquivos .cpp
     target_compile_options(mmap_compiler PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W3 /Zi>)
     target_compile_options(mmap_compiler PRIVATE $<$<COMPILE_LANGUAGE:C>:/W3 /Zi>)
 else()
-    # Para Compiladores GCC/Clang (Linux/macOS)
     target_compile_options(mmap_compiler PRIVATE -Wall -g)
 endif()
