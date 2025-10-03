@@ -2,7 +2,7 @@
 Este manual define a convenção de nomeação no Blender e o mapeamento para as estruturas binárias do seu arquivo de cena (.mmap).
 
 ## I. Estrutura de Nomenclatura (Regra Geral)  
-Todo objeto de layout (Empty) no Blender deve seguir o formato, usando o _ como separador:
+Todo objeto de layout (Empty) no Blender deve seguir o formato, usando o ```_``` como separador:
 
 ```PREFIXO_[Nome Unico]_[Variante]_SUFIXO```
 
@@ -43,3 +43,15 @@ O seu compiler deve ser instruído a buscar as seguintes propriedades no Empty:
 | SPAWN_MOB_ID | Inteiro | SCENE_SECTION_NPC_SPAWNS | Se for um SPAWN_, o ID do monstro a ser gerado (lido da sua base de dados).  |
 | ARRAY_MODULE_LENGTH | Float | (Calculado pelo Compiler) | Obrigatório para ARRAY_. O comprimento exato do módulo a ser repetido (Ex: 4.0 metros).  |
 | TERRAIN_COL_MESH | Texto/String | SCENE_SECTION_TERRAIN_DATA | O nome da Mesh de Colisão dentro do GLB principal (Ex: UCX_Terrain). |
+
+
+Objetos por tipo e Aplicação
+
+O Terreno é um dos principais objetos, ele sempre será único em cada cena. Para ser renderizado dentro do ambiente do jogo o terreno depende de 2 objetos, um Empty e a Mesh do terreno.
+O Empty deve seguir o padrão de prefixo de nome: TER_Base_Mesh
+A Mesh deve seguir o padrão de prefixo de novme: SM_Terrain_Mesh
+
+O objeto Empty, define a posição exata onde o o terreno sera instanciado, será o ponto do centro da renderização. 0,0,0.
+O objeto Mesh do terreno deve ter sua origem (pivot point) em seu centro geométrico, esse ponto ficará alinhado a posição do empty de terreno.
+
+O arquivo de terreno geralmente é a base de toda cena. Todos os emptys de layout e mecanicas de jogo, vão no mesmo arquivo GLB do terreno, com isso cada Empty representa a posição exata para instanciação de assets, triggers e outras configurações em cima do terreno.
