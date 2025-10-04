@@ -13,6 +13,7 @@
 #include "./../../engine/core/SceneLoader.h"
 #include "./../../shared/mmap_format/SceneFileFormat.h"
 #include "./../../engine/asset/obj_loader.h"
+#include "./../../engine/asset/asset_manager.h"
 #include "./../../engine/render/texture.h"
 #include "./../../engine/asset/gltf_loader.h"
 #include "./../../engine/game/game_object.h"
@@ -21,6 +22,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <iostream>
 #include <memory>
@@ -117,65 +119,58 @@ namespace Engine
         }
 
         // ====================================================================
-        // 2. ITERAÇÃO E INSTANCIAÇÃO DOS OBJETOS SECUNDÁRIOS
+        // 2. ITERAÇÃO E INSTANCIAÇÃO DOS OBJETOS SECUNDÁRIOS (DATA-DRIVEN)
         // ====================================================================
 
-        // NOVO: Cache de Assets (Simula um Asset Manager)
-        // Armazena Modelos já carregados (string: nome do GLB, unique_ptr: o modelo base)
-        std::map<std::string, std::shared_ptr<Engine::Asset::Model>> assetCache;
+        // Acessa o Asset Manager global (Singleton)
+        Engine::Asset::AssetManager &assetManager = Engine::Asset::AssetManager::Get();
 
         // --- LÓGICA DE INSTANCIAÇÃO (ARRAY E ESTÁTICOS) ---
 
         for (const auto &node : sceneLoader.nodes)
         {
-
-            // Ignoramos os nodes de controle (TERRAIN_BASE) e os originais ARRAY_START
+            // Ignoramos os nodes de controle (TERRAIN_BASE) e os originais ARRAY_START/END
             if (node.type == EntityType::TYPE_TERRAIN_BASE || node.type == EntityType::TYPE_ARRAY_START)
             {
                 continue;
             }
 
-            // Se o node for do tipo STATIC_MESH (os 20 módulos gerados)
+            // Se o node for do tipo STATIC_MESH (os módulos gerados pelo Array)
             if (node.type == EntityType::TYPE_STATIC_MESH)
             {
+                // 1. Otimização: Elimina a string hardcoded e usa o ID numérico salvo no MMAP
+                uint32_t asset_id = node.asset_reference_id;
 
-                // 1. Otimização: Determinar qual Asset GLB carregar
-                // Buscamos o nome do asset (que foi codificado como 'wall_module_placeholder.glb' no compile-time)
-                // NOTA: Para o teste, hardcodaremos o nome do asset, pois ele não foi salvo no MMAP binário.
-                // No futuro, o AssetManager faria essa tradução via node.asset_reference_id.
+                // 2. A Engine AGORA só precisa saber o ID. O Asset Manager faz o resto.
+                std::shared_ptr<Engine::Asset::Model> baseModel = assetManager.getModel(asset_id); // <-- CHAMADA FINAL!
 
-                std::string asset_name = "wall_module_placeholder.glb"; // <<-- Ainda hardcoded, mas será resolvido!
-
-                // 2. Otimização: Carregar o Asset Apenas uma Vez (Caching)
-                if (assetCache.find(asset_name) == assetCache.end())
+                if (!baseModel)
                 {
+                    // NOVO: Traduz o ID para o nome (string) APENAS para o log de erro!
+                    std::string asset_name_for_log = assetManager.getAssetPathByID(asset_id);
 
-                    auto loadedModel = Engine::Asset::GLTFLoader::loadGLTF("assets/models/" + asset_name);
-
-                    if (loadedModel)
-                    {
-                        // Armazena no cache como shared_ptr, pois todos os objetos compartilharão esta geometria
-                        assetCache[asset_name] = std::shared_ptr<Engine::Asset::Model>(loadedModel.release());
-                        Engine::Log::Info("Asset Manager: Modelo de Muro carregado e armazenado no cache.");
-                    }
-                    else
-                    {
-                        Engine::Log::Error("Asset Manager: Falha ao carregar modelo de muro!");
-                        continue; // Pula a instanciação
-                    }
+                    Engine::Log::Error(std::format("Asset Manager: Falha ao obter modelo '{}' (ID: {}). Pulando instanciação.",
+                                                   asset_name_for_log,
+                                                   asset_id));
+                    continue;
                 }
+                // 2. Instanciação: Cria o GameObject, aplica Posição e Rotação
 
-                // 3. Instanciação: Cria o GameObject e define a posição
-                auto baseModel = assetCache[asset_name];
-
-                // Criar uma cópia profunda (Deep Copy) do modelo base para a nova instância
-                // NOTA: O método clone() deve ser chamado no objeto base do cache!
+                // Cria uma cópia profunda (Deep Copy) da ESTRUTURA Model para a nova instância
                 auto moduleModelCopy = baseModel->clone();
 
                 auto moduleObject = std::make_unique<Engine::Game::GameObject>(std::move(moduleModelCopy));
 
-                // Posição exata calculada pelo compiler
+                // Posição e Rotação (Conversão do Quatérnio MMAP)
+                glm::quat rotationQuat(
+                    node.rotation_quat[0], // W
+                    node.rotation_quat[1], // X
+                    node.rotation_quat[2], // Y
+                    node.rotation_quat[3]  // Z
+                );
+
                 moduleObject->setPosition(glm::vec3(node.position[0], node.position[1], node.position[2]));
+                moduleObject->setRotation(rotationQuat);
 
                 m_gameObjects.push_back(std::move(moduleObject));
             }
@@ -218,8 +213,7 @@ namespace Engine
         glEnable(GL_DEPTH_TEST);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-        // --- MUDANÇA AQUI (BLOCO DA CÂMERA) ---
-        // Agora verificamos o tipo da câmera dinamicamente.
+        // Verificar camera dinamicamente
 
         // Se a câmera for uma OrbitCamera, configura o alvo e os limites.
         if (auto *orbitCam = dynamic_cast<Engine::Camera::OrbitCamera *>(m_camera.get()))

@@ -91,7 +91,24 @@ enum class EntityType : uint8_t
 };
 
 // =========================================================================================
-// 5. BLOCOS DE DADOS ESPECÍFICOS (APONTADOS PELO SceneNode::specific_data_offset)
+// 5. ESTRUTURA DE DICIONÁRIO DE ASSETS
+// =========================================================================================
+
+#define MAX_ASSET_PATH_LENGTH 128
+
+// Estrutura do Dicionário de Assets (será compilado no asset_dictionary.bin)
+struct AssetEntry {
+    uint32_t asset_id;                        // O ID numérico (hash) que está no MMAP
+    char asset_path[MAX_ASSET_PATH_LENGTH];   // O caminho real do arquivo GLB/Texture (string de tamanho fixo)
+    uint8_t asset_type;                       // 1=Model, 2=Texture, 3=Audio (Para o AssetManager)
+    uint8_t reserved[3];                      // Padding para alinhamento futuro
+};
+
+// ... (Você pode adicionar um AssetDictionaryHeader para saber o número total de entradas)
+// struct AssetDictionaryHeader { uint32_t entry_count; };
+
+// =========================================================================================
+// 6. BLOCOS DE DADOS ESPECÍFICOS (APONTADOS PELO SceneNode::specific_data_offset)
 // =========================================================================================
 
 // Dados para a Seção: SCENE_SECTION_NPC_SPAWNS (TYPE_NPC, TYPE_MOB_SPAWN)
