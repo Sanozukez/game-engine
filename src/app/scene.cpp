@@ -16,6 +16,7 @@
 #include "./../../engine/asset/asset_manager.h"
 #include "./../../engine/render/texture.h"
 #include "./../../engine/asset/gltf_loader.h"
+#include "./../../engine/game/world_initializer.h"
 #include "./../../engine/game/game_object.h"
 #include "./../../engine/game/player_character.h"
 #include "./../../engine/input/input_manager.h"
@@ -57,6 +58,10 @@ namespace Engine
         Engine::Log::Info("Engine::Scene::~Scene() - Destruindo objetos da cena.");
     }
 
+    void Scene::addGameObject(std::unique_ptr<Engine::Game::GameObject> obj) {
+        m_gameObjects.push_back(std::move(obj));
+    }
+
     void Scene::initialize()
     {
         Engine::Log::Info("Engine::Scene::initialize() - início");
@@ -71,147 +76,151 @@ namespace Engine
             return;
         }
 
-        // ====================================================================
-        // 1. NOVO FLUXO: CARREGAMENTO BINÁRIO (MMAP)
-        // ====================================================================
-        Engine::Log::Info("Engine::Scene::initialize() - Iniciando carregamento MMAP.");
+        // 2. CARREGAMENTO DO MUNDO (Chamada Limpa para o WorldInitializer)
+        // O WorldInitializer fará todo o MMAP loading e instanciação
+        Engine::Game::WorldInitializer::Initialize(*this, m_playerCharacter, m_terrain);
 
-        Engine::SceneLoader sceneLoader;
-        // O nome do arquivo final do mapa é o que foi gerado pelo nosso compiler
-        bool loadSuccess = sceneLoader.loadMapBinary("assets/models/test_scene_1.mmap");
+        // // ====================================================================
+        // // 1. NOVO FLUXO: CARREGAMENTO BINÁRIO (MMAP)
+        // // ====================================================================
+        // Engine::Log::Info("Engine::Scene::initialize() - Iniciando carregamento MMAP.");
 
-        if (!loadSuccess)
-        {
-            Engine::Log::Error("Falha crítica ao carregar arquivo de cena (.mmap).");
-            return;
-        }
+        // Engine::SceneLoader sceneLoader;
+        // // O nome do arquivo final do mapa é o que foi gerado pelo nosso compiler
+        // bool loadSuccess = sceneLoader.loadMapBinary("assets/models/test_scene_1.mmap");
 
-        const auto &loaded_nodes = sceneLoader.nodes;
-        const SceneNode *terrainNode = nullptr;
+        // if (!loadSuccess)
+        // {
+        //     Engine::Log::Error("Falha crítica ao carregar arquivo de cena (.mmap).");
+        //     return;
+        // }
 
-        // ====================================================================
-        // 1. LÓGICA DO TERRENO PRINCIPAL (Procura o TYPE_TERRAIN_BASE)
-        // ====================================================================
-        for (const auto &node : loaded_nodes)
-        {
-            if (node.type == EntityType::TYPE_TERRAIN_BASE)
-            { // <-- NOVO FILTRO
-                terrainNode = &node;
-                break;
-            }
-        }
+        // const auto &loaded_nodes = sceneLoader.nodes;
+        // const SceneNode *terrainNode = nullptr;
 
-        if (terrainNode)
-        {
-            // Carrega a geometria do Terreno UMA VEZ, usando a posição do primeiro node estático
-            auto terrainModel = Engine::Asset::GLTFLoader::loadGLTF("assets/models/test_scene_1.glb");
-            auto terrainObject = std::make_unique<Engine::Game::GameObject>(std::move(terrainModel));
-            terrainObject->setPosition(glm::vec3(terrainNode->position[0], terrainNode->position[1], terrainNode->position[2]));
+        // // ====================================================================
+        // // 1. LÓGICA DO TERRENO PRINCIPAL (Procura o TYPE_TERRAIN_BASE)
+        // // ====================================================================
+        // for (const auto &node : loaded_nodes)
+        // {
+        //     if (node.type == EntityType::TYPE_TERRAIN_BASE)
+        //     { // <-- NOVO FILTRO
+        //         terrainNode = &node;
+        //         break;
+        //     }
+        // }
 
-            m_terrain = terrainObject.get();
-            m_gameObjects.push_back(std::move(terrainObject));
+        // if (terrainNode)
+        // {
+        //     // Carrega a geometria do Terreno UMA VEZ, usando a posição do primeiro node estático
+        //     auto terrainModel = Engine::Asset::GLTFLoader::loadGLTF("assets/models/test_scene_1.glb");
+        //     auto terrainObject = std::make_unique<Engine::Game::GameObject>(std::move(terrainModel));
+        //     terrainObject->setPosition(glm::vec3(terrainNode->position[0], terrainNode->position[1], terrainNode->position[2]));
 
-            Engine::Log::Info("GameObject Terreno BASE carregado via MMAP!");
-        }
-        else
-        {
-            Engine::Log::Error("Nenhum Node Estático encontrado para ser o Terreno Base.");
-        }
+        //     m_terrain = terrainObject.get();
+        //     m_gameObjects.push_back(std::move(terrainObject));
 
-        // ====================================================================
-        // 2. ITERAÇÃO E INSTANCIAÇÃO DOS OBJETOS SECUNDÁRIOS (DATA-DRIVEN)
-        // ====================================================================
+        //     Engine::Log::Info("GameObject Terreno BASE carregado via MMAP!");
+        // }
+        // else
+        // {
+        //     Engine::Log::Error("Nenhum Node Estático encontrado para ser o Terreno Base.");
+        // }
 
-        // Acessa o Asset Manager global (Singleton)
-        Engine::Asset::AssetManager &assetManager = Engine::Asset::AssetManager::Get();
+        // // ====================================================================
+        // // 2. ITERAÇÃO E INSTANCIAÇÃO DOS OBJETOS SECUNDÁRIOS (DATA-DRIVEN)
+        // // ====================================================================
 
-        // --- LÓGICA DE INSTANCIAÇÃO (ARRAY E ESTÁTICOS) ---
+        // // Acessa o Asset Manager global (Singleton)
+        // Engine::Asset::AssetManager &assetManager = Engine::Asset::AssetManager::Get();
 
-        for (const auto &node : sceneLoader.nodes)
-        {
-            // Ignoramos os nodes de controle (TERRAIN_BASE) e os originais ARRAY_START/END
-            if (node.type == EntityType::TYPE_TERRAIN_BASE || node.type == EntityType::TYPE_ARRAY_START)
-            {
-                continue;
-            }
+        // // --- LÓGICA DE INSTANCIAÇÃO (ARRAY E ESTÁTICOS) ---
 
-            // Se o node for do tipo STATIC_MESH (os módulos gerados pelo Array)
-            if (node.type == EntityType::TYPE_STATIC_MESH)
-            {
-                // 1. Otimização: Elimina a string hardcoded e usa o ID numérico salvo no MMAP
-                uint32_t asset_id = node.asset_reference_id;
+        // for (const auto &node : sceneLoader.nodes)
+        // {
+        //     // Ignoramos os nodes de controle (TERRAIN_BASE) e os originais ARRAY_START/END
+        //     if (node.type == EntityType::TYPE_TERRAIN_BASE || node.type == EntityType::TYPE_ARRAY_START)
+        //     {
+        //         continue;
+        //     }
 
-                // 2. A Engine AGORA só precisa saber o ID. O Asset Manager faz o resto.
-                std::shared_ptr<Engine::Asset::Model> baseModel = assetManager.getModel(asset_id); // <-- CHAMADA FINAL!
+        //     // Se o node for do tipo STATIC_MESH (os módulos gerados pelo Array)
+        //     if (node.type == EntityType::TYPE_STATIC_MESH)
+        //     {
+        //         // 1. Otimização: Elimina a string hardcoded e usa o ID numérico salvo no MMAP
+        //         uint32_t asset_id = node.asset_reference_id;
 
-                if (!baseModel)
-                {
-                    // NOVO: Traduz o ID para o nome (string) APENAS para o log de erro!
-                    std::string asset_name_for_log = assetManager.getAssetPathByID(asset_id);
+        //         // 2. A Engine AGORA só precisa saber o ID. O Asset Manager faz o resto.
+        //         std::shared_ptr<Engine::Asset::Model> baseModel = assetManager.getModel(asset_id); // <-- CHAMADA FINAL!
 
-                    Engine::Log::Error(std::format("Asset Manager: Falha ao obter modelo '{}' (ID: {}). Pulando instanciação.",
-                                                   asset_name_for_log,
-                                                   asset_id));
-                    continue;
-                }
-                // 2. Instanciação: Cria o GameObject, aplica Posição e Rotação
+        //         if (!baseModel)
+        //         {
+        //             // NOVO: Traduz o ID para o nome (string) APENAS para o log de erro!
+        //             std::string asset_name_for_log = assetManager.getAssetPathByID(asset_id);
 
-                // Cria uma cópia profunda (Deep Copy) da ESTRUTURA Model para a nova instância
-                auto moduleModelCopy = baseModel->clone();
+        //             Engine::Log::Error(std::format("Asset Manager: Falha ao obter modelo '{}' (ID: {}). Pulando instanciação.",
+        //                                            asset_name_for_log,
+        //                                            asset_id));
+        //             continue;
+        //         }
+        //         // 2. Instanciação: Cria o GameObject, aplica Posição e Rotação
 
-                auto moduleObject = std::make_unique<Engine::Game::GameObject>(std::move(moduleModelCopy));
+        //         // Cria uma cópia profunda (Deep Copy) da ESTRUTURA Model para a nova instância
+        //         auto moduleModelCopy = baseModel->clone();
 
-                // Posição e Rotação (Conversão do Quatérnio MMAP)
-                glm::quat rotationQuat(
-                    node.rotation_quat[0], // W
-                    node.rotation_quat[1], // X
-                    node.rotation_quat[2], // Y
-                    node.rotation_quat[3]  // Z
-                );
+        //         auto moduleObject = std::make_unique<Engine::Game::GameObject>(std::move(moduleModelCopy));
 
-                moduleObject->setPosition(glm::vec3(node.position[0], node.position[1], node.position[2]));
-                moduleObject->setRotation(rotationQuat);
+        //         // Posição e Rotação (Conversão do Quatérnio MMAP)
+        //         glm::quat rotationQuat(
+        //             node.rotation_quat[0], // W
+        //             node.rotation_quat[1], // X
+        //             node.rotation_quat[2], // Y
+        //             node.rotation_quat[3]  // Z
+        //         );
 
-                m_gameObjects.push_back(std::move(moduleObject));
-            }
+        //         moduleObject->setPosition(glm::vec3(node.position[0], node.position[1], node.position[2]));
+        //         moduleObject->setRotation(rotationQuat);
 
-            // ... (Lógica futura para NPCs e Triggers)
-        }
+        //         m_gameObjects.push_back(std::move(moduleObject));
+        //     }
 
-        // 2. GameObject do Personagem
-        try
-        {
-            auto characterModel = Engine::Asset::GLTFLoader::loadGLTF("assets/models/character_placeholder.glb");
-            if (characterModel)
-            {
-                auto characterObject = std::make_unique<Engine::Game::PlayerCharacter>(std::move(characterModel));
-                characterObject->name = "PlayerCharacter";
-                characterObject->setPosition(glm::vec3(0.0f, 0.9f, 0.0f)); // Posição fixa por enquanto
+        //     // ... (Lógica futura para NPCs e Triggers)
+        // }
 
-                auto &config = Engine::ConfigManager::Get();
-                characterObject->setCameraFocusHeight(config.getValue<float>("character.player.camera_focus_height", 1.0f));
-                Engine::Log::Info("Altura de foco da câmera configurada a partir do JSON.");
+        // // 2. GameObject do Personagem
+        // try
+        // {
+        //     auto characterModel = Engine::Asset::GLTFLoader::loadGLTF("assets/models/character_placeholder.glb");
+        //     if (characterModel)
+        //     {
+        //         auto characterObject = std::make_unique<Engine::Game::PlayerCharacter>(std::move(characterModel));
+        //         characterObject->name = "PlayerCharacter";
+        //         characterObject->setPosition(glm::vec3(0.0f, 0.9f, 0.0f)); // Posição fixa por enquanto
 
-                characterObject->setMovementSpeed(config.getValue<float>("character.player.movement_speed", 5.0f));
-                characterObject->setRotationSpeed(config.getValue<float>("character.player.rotation_speed_degrees", 75.0f));
-                Engine::Log::Info("Velocidades do PlayerCharacter configuradas a partir do arquivo JSON.");
+        //         auto &config = Engine::ConfigManager::Get();
+        //         characterObject->setCameraFocusHeight(config.getValue<float>("character.player.camera_focus_height", 1.0f));
+        //         Engine::Log::Info("Altura de foco da câmera configurada a partir do JSON.");
 
-                m_playerCharacter = characterObject.get();
-                m_gameObjects.push_back(std::move(characterObject));
-                Engine::Log::Info("GameObject Personagem (cubo) carregado e adicionado à cena!");
-            }
-            else
-            {
-                Engine::Log::Error("Falha ao criar GameObject do Personagem: Modelo nulo.");
-            }
-        }
-        catch (const std::exception &e)
-        {
-            Engine::Log::Error(std::format("Erro ao carregar GameObject do Personagem (cubo): {}", e.what()));
-        }
+        //         characterObject->setMovementSpeed(config.getValue<float>("character.player.movement_speed", 5.0f));
+        //         characterObject->setRotationSpeed(config.getValue<float>("character.player.rotation_speed_degrees", 75.0f));
+        //         Engine::Log::Info("Velocidades do PlayerCharacter configuradas a partir do arquivo JSON.");
 
-        glEnable(GL_DEPTH_TEST);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        //         m_playerCharacter = characterObject.get();
+        //         m_gameObjects.push_back(std::move(characterObject));
+        //         Engine::Log::Info("GameObject Personagem (cubo) carregado e adicionado à cena!");
+        //     }
+        //     else
+        //     {
+        //         Engine::Log::Error("Falha ao criar GameObject do Personagem: Modelo nulo.");
+        //     }
+        // }
+        // catch (const std::exception &e)
+        // {
+        //     Engine::Log::Error(std::format("Erro ao carregar GameObject do Personagem (cubo): {}", e.what()));
+        // }
+
+        // glEnable(GL_DEPTH_TEST);
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         // Verificar camera dinamicamente
 

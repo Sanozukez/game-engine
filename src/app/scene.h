@@ -7,7 +7,12 @@
 #include "./../../engine/core/SceneLoader.h"
 #include "./../../shared/mmap_format/SceneFileFormat.h"
 #include "./../../engine/render/camera/icamera.h" 
-#include "./../../engine/render/texture.h" 
+#include "./../../engine/render/texture.h"
+
+// Forward Declaration para o WorldInitializer
+namespace Engine::Game {
+    class WorldInitializer; 
+}
 
 namespace Engine {
     namespace Render {
@@ -42,6 +47,8 @@ public:
     
     Engine::Camera::ICamera& getCamera();
     void setCamera(std::unique_ptr<Engine::Camera::ICamera> camera);
+
+    void addGameObject(std::unique_ptr<Engine::Game::GameObject> obj);
     
     // Método que adicionamos para acessar o player a partir do App
     Engine::Game::PlayerCharacter* getPlayer();

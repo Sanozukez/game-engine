@@ -19,7 +19,14 @@ AssetManager::AssetManager()
     // Inicialização Temporária do Dicionário (Hardcode para o teste)
     // Este bloco será substituído pelo carregamento binário do dicionário futuramente.
     m_assetIDToPathMap[3665308213] = "wall_module_placeholder.glb"; // ID do muro
-    m_assetIDToPathMap[0] = "fallback_asset.glb"; // Fallback para ID 0
+   // 2. TERRENO/MAPA (ID do 'map_test.glb' ou 'test_scene_1.glb')
+    m_assetIDToPathMap[2727254143] = "test_scene_1.glb"; // Ou o nome GLB correto do seu mapa
+    
+    // 3. PERSONAGEM (ID do 'character_placeholder.glb')
+    m_assetIDToPathMap[614879287] = "character_placeholder.glb"; 
+    
+    // 4. FALLBACK
+    m_assetIDToPathMap[0] = "fallback_asset.glb"; 
 
     Engine::Log::Info("AssetManager: Dicionario de Assets temporariamente carregado.");
 }

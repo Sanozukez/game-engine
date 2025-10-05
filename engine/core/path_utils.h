@@ -9,4 +9,8 @@ namespace Engine { // **** NOVO: NAMESPACE ENGINE ****
 std::filesystem::path resolveEnginePath(const std::string& relativePath);
 std::string loadFileFromEngineAssets(const std::string& relativePath);
 
+// Resolve o caminho, mas NÃO verifica se o arquivo existe.
+// Essencial para operações de ESCRITA (build tools e save games).
+std::filesystem::path resolveEnginePathForWrite(const std::string& relativePath);
+
 } // namespace Engine

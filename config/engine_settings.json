@@ -6,6 +6,7 @@
     "fullscreen": false,
     "resizable": false
   },
+
   "camera": {
     "default_type": "orbit",
     "orbit": {
@@ -15,11 +16,16 @@
       "max_pitch_degrees": 15.0
     }
   },
+
   "character": {
     "player": {
       "movement_speed": 5.5,
       "rotation_speed_degrees": 80.0,
       "camera_focus_height": 1.2
     }
-  }
+  },
+
+   "world": {
+    "start_map_path": "assets/models/test_scene_1.mmap"
+  }  
 }

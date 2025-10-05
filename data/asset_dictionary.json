@@ -1,0 +1,29 @@
+{
+  "assets": [
+    {
+      "name": "wall_module_placeholder.glb",
+      "type": "Model",
+      "path": "wall_module_placeholder.glb",
+      "description": "Módulo base do muro para array instanciado."
+    },
+    {
+      "name": "character_placeholder.glb",
+      "type": "Model",
+      "path": "character_placeholder.glb",
+      "description": "Modelo de personagem padrão."
+    },
+    {
+      "name": "TER_Forest_Base.glb",
+      "type": "Model",
+      "path": "map_test.glb",
+      "description": "Malha base do terreno (geometria)."
+    },
+    {
+      "name": "grass_albedo.png",
+      "type": "Texture",
+      "path": "textures/terrain/grass_albedo.png",
+      "description": "Textura PBR Albedo da grama."
+    }
+
+  ]
+}
