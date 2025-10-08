@@ -1,14 +1,64 @@
 // // engine/asset/asset_manager.cpp
 
 #include "asset_manager.h"
-#include "../core/log.h"
-#include "gltf_loader.h" // Precisamos do loader para carregar o GLB
 #include "model.h"       // Precisamos da definição completa de Model
+#include "gltf_loader.h" // Precisamos do loader para carregar o GLB
+#include "../core/log.h"
+#include "../core/path_utils.h"
+#include "../../shared/mmap_format/SceneFileFormat.h"
+
+#include <fstream>
 
 namespace Engine
 {
     namespace Asset
     {
+        // Define o nome do arquivo binário que o compilador gerou
+        const char *ASSET_DICTIONARY_BIN_PATH = "data/assets_dictionary.bin";
+
+        // ------------------------------------------------------------------------
+        // FUNÇÃO QUE CARREGA O DICIONÁRIO BINÁRIO (Substitui o hardcode)
+        // ------------------------------------------------------------------------
+
+        bool AssetManager::loadAssetDictionary()
+        {
+            // 1. Resolve o caminho para o arquivo binário
+            // Usa path_utils para resolver o caminho da Engine
+            std::string fullPath = Engine::resolveEnginePath(ASSET_DICTIONARY_BIN_PATH).string();
+
+            std::ifstream file(fullPath, std::ios::binary | std::ios::in);
+            if (!file.is_open())
+            {
+                Engine::Log::Error(std::format("AssetManager: Falha ao abrir o dicionario binario: {}. Usando Fallback.", fullPath));
+                return false;
+            }
+
+            // 2. Leitura do Header (Contagem total de entradas)
+            uint32_t total_count = 0;
+            file.read(reinterpret_cast<char *>(&total_count), sizeof(uint32_t));
+
+            if (total_count == 0)
+            {
+                Engine::Log::Warn("AssetManager: Dicionario binario vazio.");
+                return true;
+            }
+
+            // 3. Leitura e Mapeamento das Entradas
+            // Nota: O tamanho da AssetEntry é crucial.
+            // Assumimos que o compilador escreveu o tamanho correto de AssetEntry.
+            std::vector<AssetEntry> entries(total_count);
+
+            file.read(reinterpret_cast<char *>(entries.data()), total_count * sizeof(AssetEntry));
+
+            for (const auto &entry : entries)
+            {
+                // Mapeamento: ID -> Caminho (string)
+                m_assetIDToPathMap[entry.asset_id] = std::string(entry.asset_path);
+            }
+
+            Engine::Log::Info(std::format("AssetManager: Dicionario binario carregado com sucesso ({} assets).", total_count));
+            return true;
+        }
 
         // =========================================================================
         // 1. CONSTRUTOR (Singleton Inicialização da Tabela de Tradução)
@@ -16,20 +66,18 @@ namespace Engine
 
         AssetManager::AssetManager()
         {
-            // Inicialização Temporária do Dicionário (Hardcode para o teste)
-            // Este bloco será substituído pelo carregamento binário do dicionário futuramente.
-            m_assetIDToPathMap[3665308213] = "wall_module_placeholder.glb"; // ID do muro
-                                                                            // 2. TERRENO/MAPA (ID do 'map_test.glb' ou 'test_scene_1.glb')
+            // Tenta carregar o dicionário do arquivo binário
+            if (!loadAssetDictionary())
+            {
+                // Fallback de DEBUG: Se o binário não for encontrado, usa o hardcode como último recurso.
+                Engine::Log::Warn("AssetManager: Usando dicionario de assets de fallback (hardcoded).");
 
-            m_assetIDToPathMap[3574192723] = "test_scene_1.glb"; // Para a mesh do terreno
-
-            // 3. PERSONAGEM (ID do 'character_placeholder.glb')
-            m_assetIDToPathMap[614879287] = "character_placeholder.glb";
-
-            // 4. FALLBACK
-            m_assetIDToPathMap[0] = "fallback_asset.glb";
-
-            Engine::Log::Info("AssetManager: Dicionario de Assets temporariamente carregado.");
+                // Coloque aqui os IDs mínimos essenciais para que o jogo não quebre em DEV.
+                m_assetIDToPathMap[614879287] = "character_placeholder.glb";
+                m_assetIDToPathMap[3665308213] = "wall_module_placeholder.glb";
+                m_assetIDToPathMap[3574192723] = "test_scene_1.glb";
+                m_assetIDToPathMap[0] = "fallback_asset.glb";
+            }
         }
 
         uint32_t AssetManager::getAssetIDByName(const std::string &assetName)
