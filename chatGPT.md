@@ -31,3 +31,15 @@ Octree: Uma árvore que divide o espaço em 8 cubos (octantes) recursivamente. �
 Empacotamento (Packing/Archiving):.pak, .dat, .vpk
 Ofuscação e Criptografia 
 Compressão (Compression)
+
+# ASSET MANAGER
+Necessário remover IDS hardcoded e implementar função de busca
+
+# Fisica
+
+Ação: Adicionar o PlayerPhysicsComponent (SRP)
+Vamos criar um novo módulo que lida apenas com a lógica de física (gravidade e detecção de chão), movendo essa complexidade para fora do PlayerCharacter.
+
+1. Criar engine/physics/player_physics_component.h/.cpp
+
+# Mob manager

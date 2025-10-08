@@ -13,6 +13,7 @@ set(MMAP_SOURCES
     mmap_compiler.cpp
     asset_processor.cpp
     array_processor.cpp
+    spawn_processor.cpp
     mmap_writer.cpp
 )
 

@@ -5,7 +5,7 @@
 #include <cmath>
 #include <numbers> // necessário para std::numbers::pi
 
-#include <glad/gl.h>
+#include "../render/opengl_types.h"
 
 namespace Engine { // NOVO: Namespace Engine
 namespace Geometry { // NOVO: Namespace Geometry

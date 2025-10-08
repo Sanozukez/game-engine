@@ -9,10 +9,8 @@ target_sources(engine
         ${CMAKE_CURRENT_SOURCE_DIR}/config_manager.cpp
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/path_utils.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/log.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/config.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/log.h       
         ${CMAKE_CURRENT_SOURCE_DIR}/config_manager.h
-
 )
 
 # Adiciona o diretório 'core' como uma diretiva de inclusão pública para o target 'engine'.

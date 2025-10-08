@@ -3,8 +3,8 @@
 
 #include <vector>
 #include <string>
-#include <memory>    // Para std::unique_ptr
-#include <glad/gl.h> // Para GLuint
+#include <memory> // Para std::unique_ptr
+// #include <glad/gl.h> // Para GLuint
 
 #include <glm/glm.hpp>
 
@@ -39,7 +39,7 @@ namespace Engine
         {
         public:
             // Construtor: usa rvalue references (&&) para mover dados eficientemente
-            Mesh(std::vector<Vertex> &&vertices, std::vector<GLuint> &&indices, std::unique_ptr<Render::Material> material);
+            Mesh(std::vector<Vertex> &&vertices, std::vector<uint32_t> &&indices, std::unique_ptr<Render::Material> material);
             ~Mesh();
 
             // Construtor de Cópia para Clone de mesh
@@ -57,14 +57,23 @@ namespace Engine
             // Retornam uma referência constante aos vetores de dados, permitindo a leitura
             // de forma eficiente (sem copiar os dados) e segura (sem permitir modificação).
             const std::vector<Vertex> &getVertices() const { return m_vertices; }
-            const std::vector<GLuint> &getIndices() const { return m_indices; }
+            const std::vector<uint32_t> &getIndices() const { return m_indices; }
 
         private:
+            // Dados do Mesh
             std::vector<Vertex> m_vertices;
-            std::vector<GLuint> m_indices;
+
+            // Assumimos que m_indices usa GLuint, mas para isolar o GLAD,
+            // usaremos uint32_t (que é o tamanho do GLuint, mas sem o include).
+            // NOTA: Se você já usa GLuint aqui, podemos ter que mudar para uint32_t para ser limpo.
+            std::vector<uint32_t> m_indices; // <-- SUBSTITUÍDO GLuint por uint32_t (Limpeza)
+
             std::unique_ptr<Render::Material> m_material; // PBR material of the mesh
 
-            GLuint m_VAO, m_VBO, m_EBO;
+            // IDs de Buffer/Array (SUBSTITUÍDO GLuint por unsigned int)
+            unsigned int m_VAO;
+            unsigned int m_VBO;
+            unsigned int m_EBO;
 
             void setupMesh();
         };

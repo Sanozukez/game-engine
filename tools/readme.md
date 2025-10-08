@@ -15,3 +15,6 @@ PS M:\Dev\game-engine\tools\dictionary_compiler\build> cmake --build . --config 
 Criando o arquivo binário de dicionário
 
 PS M:\Dev\game-engine\tools\dictionary_compiler\build> .\Debug\dictionary_compiler.exe
+
+
+cmake .. -G "Visual Studio 17 2022" -A x64

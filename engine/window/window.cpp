@@ -1,6 +1,6 @@
 // engine/window/window.cpp
 #include "window.h"
-#include <glad/gl.h>
+#include "../render/opengl_types.h"
 #include "./../core/log.h"
 #include <format> 
 #include "./../core/config.h" 

@@ -28,6 +28,7 @@ enum class SceneSectionType : uint32_t
     SCENE_SECTION_NAVMESH,       // Dados de Navegação (Pathfinding)
     SCENE_SECTION_AUDIO_ZONES,   // Zonas de Áudio/Reverb
     SCENE_SECTION_VFX_SPAWNS,    // Spawns de Efeitos Visuais (Partículas, Decals)
+    SCENE_SECTION_TERRAIN_METADATA, // Nome da Mesh de Terreno no Node TER_ TerrainMetaData
 
     SCENE_SECTION_COUNT // Total de Seções (Deve ser o último item)
 };
@@ -66,6 +67,10 @@ struct SceneFileHeader
     uint32_t chunk_y; // Coordenada de Chunk Y
 
     uint32_t reserved_A; // Espaço reservado para expansão (Alinhamento)
+
+    // NPC Spawns
+    uint32_t npc_spawn_count;      // Quantidade de spawns
+    uint64_t npc_spawn_data_offset; // Offset para o array de NPCSpawnData
 
     // 4. Tabela de Seções (Indexação Rápida)
     SceneSectionEntry sections[(int)SceneSectionType::SCENE_SECTION_COUNT];
@@ -113,8 +118,10 @@ struct AssetEntry {
 
 // Dados para a Seção: SCENE_SECTION_NPC_SPAWNS (TYPE_NPC, TYPE_MOB_SPAWN)
 struct NPCSpawnData
-{
-    uint32_t npc_id;           // ID que referencia a tabela global de stats/quests
+{    
+   // A malha do Asset (modelo 3D) vem do SceneNode::asset_reference_id
+    uint32_t unit_db_id;        // ID do Mob/NPC no Database de Unidades (ex: 1 = Lobo)
+    float position[3];         // Posição de spawn (Copia a posição do Empty)
     float respawn_time_sec;    // Tempo de respawn em segundos (0 para NPCs estáticos)
     uint16_t patrol_route_id;  // ID que referencia a rota de patrulha (NavMesh)
     uint16_t max_mobs_in_area; // Quantidade máxima de mobs ativos (para spawns de monstro)
@@ -148,11 +155,14 @@ struct LightData
 
 // Dados para a Seção: SCENE_SECTION_TERRAIN_DATA (TYPE_TERRAIN_BASE)
 // Esta struct é pequena, mas crucial para o streaming futuro
+#define MAX_MESH_NAME_LENGTH 64
+
 struct TerrainMetaData
 {
     uint32_t collision_mesh_id; // ID de referência para a malha de colisão (UCX_)
     uint32_t detail_mesh_id;    // ID de referência para a malha de grama/folhagem
     float uv_scale;             // Escala da textura do terreno (para evitar repetição visual)
+    char internal_mesh_name[MAX_MESH_NAME_LENGTH];  
 };
 
 struct SceneNode
@@ -175,6 +185,7 @@ struct SceneNode
     // Offset que aponta para o bloco de dados específico desta entidade (dentro de uma das seções do Header).
     // Ex: Se type=NPC, aponta para os dados de Quest/Respawn na seção SCENE_SECTION_NPC_SPAWNS
     uint64_t specific_data_offset;
+    char name[64];          // Permite um nome de até 63 caracteres
 };
 
 // Remove o alinhamento de 1 byte e volta para o padrão do compilador

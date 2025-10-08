@@ -97,7 +97,6 @@ namespace Engine
             }
         }
 
-        // --- MUDANÇA AQUI ---
         // A definição da função 'update' também remove o 'const' do parâmetro da câmera.
         void GameObject::update(float deltaTime, const Input::InputManager &inputManager, Scene &scene, Camera::ICamera &camera)
         {

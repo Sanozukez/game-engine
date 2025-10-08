@@ -4,7 +4,7 @@
 
 #include "./../../engine/render/shader.h" // Incluir Shader para Mesh::draw
 
-#include <glad/gl.h>
+#include "../render/opengl_types.h"
 #include <cstddef> // For offsetof
 #include <format>
 
@@ -14,8 +14,8 @@ namespace Engine
     {
 
         // --- Mesh Class ---
-        Mesh::Mesh(std::vector<Vertex> &&vertices, std::vector<GLuint> &&indices, std::unique_ptr<Render::Material> material)
-            : m_vertices(std::move(vertices)),
+        Mesh::Mesh(std::vector<Vertex> &&vertices, std::vector<uint32_t> &&indices, std::unique_ptr<Render::Material> material)
+             : m_vertices(std::move(vertices)),
               m_indices(std::move(indices)),
               m_material(std::move(material))
         {

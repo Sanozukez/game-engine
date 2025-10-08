@@ -8,7 +8,7 @@
 #include "../../engine/deps/cgltf/cgltf.h" // Necessário para cgltf_node
 
 // Constante para o comprimento base do módulo
-const float ARRAY_BASE_MODULE_LENGTH = 4.0f; 
+const float ARRAY_BASE_MODULE_LENGTH = 1.0f; 
 
 namespace Compiler { // <--- NOVO: Envolve a struct CompilerNode
 

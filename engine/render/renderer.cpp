@@ -6,7 +6,7 @@
 #include "./camera/icamera.h"
 #include "./../../src/app/scene.h"
 
-#include <glad/gl.h>
+#include "opengl_types.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/string_cast.hpp>
 

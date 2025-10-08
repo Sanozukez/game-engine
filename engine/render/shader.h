@@ -2,7 +2,7 @@
 #pragma once
 
 #include <string>
-#include <glad/gl.h>
+#include "opengl_types.h"
 #include <glm/glm.hpp>
 
 namespace Engine { 

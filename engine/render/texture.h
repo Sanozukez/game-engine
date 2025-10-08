@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include <glad/gl.h>
+#include "opengl_types.h"
 #include <string>
 #include <memory> // Necessário para unique_ptr e shared_ptr
 #include <vector> // Para raw pixel data

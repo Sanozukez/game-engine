@@ -1,9 +1,12 @@
 // // engine/game/world_initializer.cpp
 
 #include "world_initializer.h"
+#include "player_spawner.h"
+#include "world_data_fetcher.h"
 #include "../core/log.h"
-#include "../asset/asset_manager.h"
 #include "../asset/gltf_loader.h"
+
+#include "../asset/asset_manager.h"
 
 #include "../../src/app/scene.h" // Necessário para que targetScene possa chamar addGameObject()
 
@@ -23,151 +26,115 @@
 
 namespace Engine::Game
 {
-
-    // =========================================================================
-    // HELPER: Inicialização do Personagem (Movido de Scene::initialize)
-    // A única responsabilidade é criar o PlayerCharacter
-    // =========================================================================
-
-    void WorldInitializer::initializePlayerCharacter(Engine::Scene &targetScene,
-                                                     Engine::Game::PlayerCharacter *&playerCharacter)
-    {
-        try
-        {
-            // ID Hash literal de "character_placeholder.glb"
-            uint32_t characterAssetID = 614879287;
-
-            // Acessa o Manager e usa o ID correto
-            std::shared_ptr<Engine::Asset::Model> characterModel = Engine::Asset::AssetManager::Get().getModel(characterAssetID);
-
-            if (characterModel)
-            {
-                // 1. Cria um unique_ptr<Model> para ser movido
-                std::unique_ptr<Engine::Asset::Model> clonedModel = characterModel->clone();
-
-                // 2. Cria o PlayerCharacter, movendo o Model clonado
-                auto characterObject = std::make_unique<Engine::Game::PlayerCharacter>(std::move(clonedModel));
-
-                // Posição inicial hardcoded (deve vir de um SPAWN_Player_Start do MMAP no futuro)
-                characterObject->setPosition(glm::vec3(0.0f, 0.9f, 0.0f));
-
-                auto &config = Engine::ConfigManager::Get();
-                characterObject->setCameraFocusHeight(config.getValue<float>("character.player.camera_focus_height", 1.0f));
-                characterObject->setMovementSpeed(config.getValue<float>("character.player.movement_speed", 5.0f));
-                characterObject->setRotationSpeed(config.getValue<float>("character.player.rotation_speed_degrees", 75.0f));
-
-                playerCharacter = characterObject.get(); // Atualiza o ponteiro na Scene
-                targetScene.addGameObject(std::move(characterObject));
-                Engine::Log::Info("GameObject Personagem carregado e configurado!");
-            }
-        }
-        catch (const std::exception &e)
-        {
-            Engine::Log::Error(std::format("Erro ao carregar PlayerCharacter: {}", e.what()));
-        }
-    }
-
-    // =========================================================================
-    // FUNÇÃO PRINCIPAL: Carrega o Mundo MMAP (Lógica Principal)
-    // =========================================================================
-
     void WorldInitializer::Initialize(Engine::Scene &targetScene,
                                       Engine::Game::PlayerCharacter *&playerCharacter,
                                       Engine::Game::GameObject *&terrainObject)
+{
+    // 1. CARREGAMENTO DO MAPA (Configuração Dinâmica)
+    auto &config = Engine::ConfigManager::Get();
+    std::string mapPath = config.getValue<std::string>("world.start_map_path", "assets/models/default.mmap"); 
+
+    Engine::SceneLoader sceneLoader;
+    bool loadSuccess = sceneLoader.loadMapBinary(mapPath);
+
+    if (!loadSuccess) {
+        Engine::Log::Error("Falha crítica ao carregar arquivo de cena (.mmap).");
+        return;
+    }
+
+    const auto &loaded_nodes = sceneLoader.nodes;
+    Engine::Asset::AssetManager &assetManager = Engine::Asset::AssetManager::Get();
+
+    // VARIÁVEIS DE CONTROLE
+    const SceneNode *playerSpawnNode = nullptr;
+    const SceneNode *terrainNode = nullptr;
+
+
+    // 2. BUSCA DE NODES DE CONTROLE (Utiliza o Data Fetcher e resolve a posição do Player)
+
+    // A. Busca dos Nodes Principais
+    terrainNode     = WorldDataFetcher::FindNodeByType(loaded_nodes, EntityType::TYPE_TERRAIN_BASE);
+    playerSpawnNode = WorldDataFetcher::FindNodeByName(loaded_nodes, "SPAWN_Player_Start");
+    
+    // Fallback de Busca para o Terreno
+    if (!terrainNode) {
+        terrainNode = WorldDataFetcher::FindNodeByName(loaded_nodes, "TER_Base_Mesh");
+    }
+
+    // 3. CRIAÇÃO DOS OBJETOS DE CONTROLE (SETUP)
+
+    // A. Player Spawn (CORRIGIDO: PlayerSpawner usa o node para posição)
+    PlayerSpawner::Spawn(targetScene, playerCharacter, playerSpawnNode);
+
+
+    // B. Lógica do Terreno (Instanciação do Objeto Único)
+    if (terrainNode)
     {
+        uint32_t terrainAssetID = terrainNode->asset_reference_id; 
+        std::shared_ptr<Engine::Asset::Model> terrainModel = assetManager.getModel(terrainAssetID);
 
-        // 1. Instanciar o SceneLoader e carregar o MMAP
-        // Obtém o caminho do mapa do JSON de configuração
-        auto &config = Engine::ConfigManager::Get();
-        std::string mapPath = config.getValue<std::string>("world.start_map_path", "assets/models/default.mmap"); // Com fallback
-
-        Engine::SceneLoader sceneLoader;
-        bool loadSuccess = sceneLoader.loadMapBinary(mapPath); // Usa a variável!
-
-        if (!loadSuccess)
+        if (terrainModel)
         {
-            Engine::Log::Error("Falha crítica ao carregar arquivo de cena (.mmap).");
-            return;
-        }
-
-        const auto &loaded_nodes = sceneLoader.nodes;
-        Engine::Asset::AssetManager &assetManager = Engine::Asset::AssetManager::Get();
-
-        // 2. LÓGICA DO TERRENO PRINCIPAL (Busca e Instanciação)
-        const SceneNode *terrainNode = nullptr;
-        for (const auto &node : loaded_nodes)
-        {
-            if (node.type == EntityType::TYPE_TERRAIN_BASE)
-            {
-                terrainNode = &node;
-                break;
-            }
-        }
-
-        if (terrainNode)
-        {
-            // ID Hash literal do arquivo GLB que você quer carregar
-            uint32_t terrainAssetID = 2727254143;
-
-            std::shared_ptr<Engine::Asset::Model> terrainModel = assetManager.getModel(terrainAssetID);
-
-            if (terrainModel)
-            {
-                auto terrainObjectPtr = std::make_unique<Engine::Game::GameObject>(terrainModel->clone());
-                terrainObjectPtr->name = "Terrain_MMAP";
-                terrainObjectPtr->setPosition(glm::vec3(terrainNode->position[0], terrainNode->position[1], terrainNode->position[2]));
-
-                terrainObject = terrainObjectPtr.get();
-                targetScene.addGameObject(std::move(terrainObjectPtr));
-                Engine::Log::Info("GameObject Terreno BASE carregado via MMAP!");
-            }
+            auto terrainObjectPtr = std::make_unique<Engine::Game::GameObject>(terrainModel->clone());
+            
+            // Atribuição de nome e posição
+            terrainObjectPtr->name = "Terrain_MMAP";
+            terrainObjectPtr->setPosition(glm::vec3(terrainNode->position[0], terrainNode->position[1], terrainNode->position[2]));
+            
+            terrainObject = terrainObjectPtr.get();
+            targetScene.addGameObject(std::move(terrainObjectPtr));
+            Engine::Log::Info("GameObject Terreno BASE carregado com sucesso!");
         }
         else
         {
-            Engine::Log::Error("AVISO: Nenhum Node TER_BASE encontrado para ser o Terreno.");
+            Engine::Log::Error(std::format("Falha crítica ao obter Terreno (ID {}). Verifique o dicionário.", terrainAssetID));
+        }
+    }
+    else
+    {
+        Engine::Log::Error("AVISO: Nenhum Node TER_BASE encontrado para ser o Terreno.");
+    }
+
+
+    // 4. INSTANCIAÇÃO DE OBJETOS REPETITIVOS (O Loop Final)
+    for (const auto &node : loaded_nodes)
+    {
+        // Ignora os nodes de controle (já criados ou lógicos)
+        if (node.type == EntityType::TYPE_TERRAIN_BASE || 
+            node.type == EntityType::TYPE_ARRAY_START ||
+            node.asset_reference_id == 0) // Ignora marcadores lógicos sem asset
+        {
+            continue;
         }
 
-        // 3. ITERAÇÃO PARA OUTROS STATIC MESHES / ARRAYS
-        for (const auto &node : loaded_nodes)
+        // Se for um objeto que precisa ser instanciado e adicionado à cena:
+        if (node.type == EntityType::TYPE_STATIC_MESH)
         {
-            if (node.type == EntityType::TYPE_TERRAIN_BASE || node.type == EntityType::TYPE_ARRAY_START)
+            uint32_t asset_id = node.asset_reference_id;
+            std::shared_ptr<Engine::Asset::Model> baseModel = assetManager.getModel(asset_id);
+
+            if (!baseModel)
             {
+                std::string asset_name_for_log = assetManager.getAssetPathByID(asset_id);
+                Engine::Log::Error(std::format("Falha ao obter modelo '{}' (ID: {}). Pulando instanciação.",
+                                               asset_name_for_log, asset_id));
                 continue;
             }
 
-            if (node.type == EntityType::TYPE_STATIC_MESH)
-            {
+            // Criação e configuração (Muros, NPCs, Props)
+            auto moduleObject = std::make_unique<Engine::Game::GameObject>(baseModel->clone());
 
-                uint32_t asset_id = node.asset_reference_id;
-                std::shared_ptr<Engine::Asset::Model> baseModel = assetManager.getModel(asset_id);
+            // Conversão do Quatérnio e Posição
+            glm::quat rotationQuat(node.rotation_quat[0], node.rotation_quat[1], node.rotation_quat[2], node.rotation_quat[3]);
 
-                if (!baseModel)
-                {
-                    // Traduz ID para nome apenas para o log de erro!
-                    std::string asset_name_for_log = assetManager.getAssetPathByID(asset_id);
-                    Engine::Log::Error(std::format("Falha ao obter modelo '{}' (ID: {}). Pulando instanciação.",
-                                                   asset_name_for_log, asset_id));
-                    continue;
-                }
+            moduleObject->setPosition(glm::vec3(node.position[0], node.position[1], node.position[2]));
+            moduleObject->setRotation(rotationQuat);
 
-                // Instanciação: Aplica Posição e Rotação calculada pelo Compiler
-                auto moduleModelCopy = baseModel->clone();
-                auto moduleObject = std::make_unique<Engine::Game::GameObject>(std::move(moduleModelCopy));
-
-                // Conversão do Quatérnio (Lógica que resolveu o problema de rotação de 45 graus)
-                glm::quat rotationQuat(node.rotation_quat[0], node.rotation_quat[1], node.rotation_quat[2], node.rotation_quat[3]);
-
-                moduleObject->setPosition(glm::vec3(node.position[0], node.position[1], node.position[2]));
-                moduleObject->setRotation(rotationQuat);
-
-                targetScene.addGameObject(std::move(moduleObject));
-            }
+            targetScene.addGameObject(std::move(moduleObject));
         }
-
-        // 4. Inicializa PlayerCharacter (usa o helper)
-        initializePlayerCharacter(targetScene, playerCharacter);
-
-        Engine::Log::Info("World Initializer: Carregamento de mapa concluído.");
     }
+    
+    Engine::Log::Info("World Initializer: Carregamento de mapa concluído.");
+}
 
 } // namespace Engine::Game

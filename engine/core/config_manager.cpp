@@ -1,3 +1,5 @@
+// // engine/core/config_manager.cpp
+
 #include "config_manager.h"
 #include "log.h"
 #include "path_utils.h"

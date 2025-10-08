@@ -35,7 +35,7 @@ private:
   AssetManager& operator=(const AssetManager&) = delete;
 
   // A função loadAssetDictionary será um helper interno, então a mantemos private/omissa.
-  // bool loadAssetDictionary(); 
+  // bool loadAssetDictionary();   
 
 public:
   // Ponto de acesso global ao Singleton
@@ -48,6 +48,10 @@ public:
   std::string getAssetPathByID(uint32_t assetID);
 
   // (Futuro: Adicionar getTexture e getAudio)
+
+  // NOVO: Função que traduz o nome lógico do asset (string) para o ID numérico (uint32_t)
+  // USADO APENAS EM TEMPO DE INICIALIZAÇÃO.
+  uint32_t getAssetIDByName(const std::string& assetName);
 };
 
 } // namespace Asset

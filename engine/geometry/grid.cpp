@@ -1,7 +1,7 @@
 // engine/geometry/grid.cpp
 #include "grid.h"
 #include <vector>
-#include <glad/gl.h> // Incluir aqui para as chamadas GL
+// #include <glad/gl.h> // Incluir aqui para as chamadas GL
 
 namespace Engine { // NOVO: Namespace Engine
 namespace Geometry { // NOVO: Namespace Geometry

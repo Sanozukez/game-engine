@@ -15,7 +15,7 @@
     {
       "name": "TER_Forest_Base.glb",
       "type": "Model",
-      "path": "map_test.glb",
+      "path": "test_scene_1.glb",
       "description": "Malha base do terreno (geometria)."
     },
     {

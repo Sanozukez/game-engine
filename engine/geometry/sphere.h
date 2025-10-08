@@ -1,7 +1,7 @@
 // engine/geometry/sphere.h
 #pragma once
 
-#include <glad/gl.h> // Incluir aqui para GLuint
+#include "../render/opengl_types.h" // Incluir aqui para GLuint
 
 namespace Engine { // NOVO: Namespace Engine
 namespace Geometry { // NOVO: Namespace Geometry

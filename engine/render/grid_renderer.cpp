@@ -1,5 +1,5 @@
 #include "grid_renderer.h"
-#include <glad/gl.h>
+// #include <glad/gl.h>
 #include <glm/glm.hpp>
 #include <vector>
 

@@ -71,6 +71,13 @@ SceneNode create_scene_node(SceneNodeID id, cgltf_node* node) {
     SceneNode scene_node = {}; 
     scene_node.entity_id = id;
 
+    // NOVO ESSENCIAL: COPIA O NOME DO NÓ GLTF PARA O ARRAY DE CHAR DO MMAP
+    if (node->name) {
+        // Usa strncpy para copiar o nome de forma segura para o array de tamanho fixo
+        // O MAX_NAME_LENGTH deve ser 64 (o tamanho do array).
+        std::strncpy(scene_node.name, node->name, 64 - 1); 
+        scene_node.name[64 - 1] = '\0'; // Garantir terminação nula
+    }
     // Extrai a Transformação (Posição, Rotação Quatérnio, Escala)
     if (node->has_translation) {
         memcpy(scene_node.position, node->translation, sizeof(float) * 3);

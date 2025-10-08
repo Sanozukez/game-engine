@@ -14,6 +14,7 @@
 // 2. Módulos Funcionais (APIs que o main chama)
 #include "asset_processor.h"
 #include "array_processor.h"
+#include "spawn_processor.h"
 // Inclua o header do escritor (que estava faltando)
 #include "mmap_writer.h"
 // Use o namespace onde as funções estão definidas
@@ -29,12 +30,17 @@ using namespace Compiler;
 
 int main(int argc, char *argv[])
 {
-    // A lista temporária (CORRIGIDA para usar o nome FINAL)
     // Contém os nós lidos do GLB (SceneNode + cgltf_node*)
     std::vector<CompilerNode> initial_nodes;
 
     // A lista principal que contém os nós originais + as instâncias geradas pelo array
     std::vector<SceneNode> final_scene_nodes;
+
+    // A lista principal que contém os nós originais + as instâncias geradas pelo array
+    std::vector<NPCSpawnData> npc_spawn_nodes;
+
+    // Container para armazenar os dados de Metadados do Terreno
+    std::vector<TerrainMetaData> terrain_meta_data;
 
     SceneNodeID next_entity_id = 1;
 
@@ -71,58 +77,84 @@ int main(int argc, char *argv[])
     {
         cgltf_node *node = &data->nodes[i];
 
-        // Verifica se é um node que a nossa Engine precisa processar (via asset_processor.h)
+        // Verifica se é um node que a nossa Engine precisa processar
         if (Compiler::is_scene_asset(node->name))
         {
-
             // 1. Cria o SceneNode base a partir do nó GLTF
-            // (Função movida para asset_processor.cpp)
             SceneNode scene_node = Compiler::create_scene_node(next_entity_id, node);
             next_entity_id++;
 
-            // 2. Atribuição de Tipo
+            // 2. EXTRAI METADADOS ESSENCIAIS: ASSET_REF_ID (Necessário para o Hashing)
+            std::string asset_ref_id_str = Compiler::get_string_metadata(node, "ASSET_REF_ID");
+            uint32_t asset_id = 0;
+
+            if (!asset_ref_id_str.empty())
+            {
+                std::hash<std::string> hasher;
+                asset_id = static_cast<uint32_t>(hasher(asset_ref_id_str));
+            }
+            scene_node.asset_reference_id = asset_id; // Salva o ID numérico
+
+            // 3. ATRIBUIÇÃO DE TIPO E COLETA DE DADOS DE GAMEPLAY
             if (strncmp(node->name, "TER_", 4) == 0)
             {
                 scene_node.type = EntityType::TYPE_TERRAIN_BASE;
+
+                // 1. Cria a struct de Metadados
+                TerrainMetaData meta = {};
+
+                // 2. Extrai a propriedade customizada para o nome da Mesh
+                std::string mesh_name = Compiler::get_string_metadata(node, "INTERNAL_MESH_REF");
+
+                // 3. Copia a string para o buffer de tamanho fixo
+                strncpy(meta.internal_mesh_name, mesh_name.c_str(), MAX_MESH_NAME_LENGTH - 1);
+
+                // Por enquanto, os outros campos (uv_scale, collision_mesh_id) são zero.
+
+                // Armazena a struct
+                terrain_meta_data.push_back(meta);
+
+                // O offset aponta para a posição FINAL desta struct no MMAP
+                scene_node.specific_data_offset = (uint64_t)terrain_meta_data.size() - 1;
             }
             else if (strncmp(node->name, "ARRAY_", 6) == 0)
             {
                 scene_node.type = EntityType::TYPE_ARRAY_START;
             }
-            else
+            else if (strncmp(node->name, "SPAWN_", 6) == 0)
             {
+                // -- PROCESSAMENTO DE SPAWN DATA --
+
+                // Tipo de Node: STATIC_MESH para visualização (temporário)
                 scene_node.type = EntityType::TYPE_STATIC_MESH;
-            }
 
-            // 3. EXTRAI METADADOS ESSENCIAIS: ASSET_REF_ID
-            std::string asset_ref_id_str = Compiler::get_string_metadata(node, "ASSET_REF_ID");
-            uint32_t asset_id = 0; // O ID numérico a ser gravado no MMAP
+                // 1. Processa as Custom Properties para o bloco de NPC
+                // (Função process_npc_spawn usa o ASSET_REF_ID/Hash para preencher unit_db_id)
+                NPCSpawnData spawn_data = Compiler::process_npc_spawn(node);
 
-            if (asset_ref_id_str.empty())
-            {
-                std::cerr << "AVISO: Node '" << node->name << "' nao tem a propriedade ASSET_REF_ID. Usando ID 0." << std::endl;
+                // 2. Armazena o offset (índice na lista npc_spawn_nodes) e o dado
+                // O offset é o índice na lista, que será o tamanho ATUAL da lista ANTES de adicionar.
+                scene_node.specific_data_offset = (uint64_t)npc_spawn_nodes.size();
+
+                // 3. Adiciona o dado à lista de spawns
+                npc_spawn_nodes.push_back(spawn_data);
             }
+            
             else
             {
-                // CRUCIAL: Cria um ID numérico a partir do nome do arquivo (Hash simples para teste)
-                std::hash<std::string> hasher;
-                // O ID final é o hash do nome do asset (string)
-                asset_id = static_cast<uint32_t>(hasher(asset_ref_id_str));
+                scene_node.type = EntityType::TYPE_STATIC_MESH; // Default para objetos SM_
             }
 
-            // 4. Salvar o ID no SceneNode
-            scene_node.asset_reference_id = asset_id; // <--- AGORA O MMAP TEM O ID NUMÉRICO
-
-            // Log de debug para ver o Asset ID sendo lido
-            std::cout << "  - Asset Ref: " << (asset_ref_id_str.empty() ? "(Nenhum)" : asset_ref_id_str)
-                      << " | ID Num: " << asset_id << std::endl;
-
-            // 5. Armazena o node temporário (para uso na expansão de Arrays)
+            // 4. Armazena o node para processamento posterior (Arrays) e lista final
             CompilerNode temp = {scene_node, node};
             initial_nodes.push_back(temp);
-            final_scene_nodes.push_back(scene_node); // Adiciona o nó original
+            final_scene_nodes.push_back(scene_node); // Adiciona o nó original à lista final
 
-            std::cout << "  - Node: " << node->name << " | ID: " << scene_node.entity_id << std::endl;
+            // Log de debug
+            std::cout << "  - Node: " << node->name
+                      << " | Type: " << (int)scene_node.type
+                      << " | ID: " << scene_node.entity_id
+                      << " | Asset ID Num: " << scene_node.asset_reference_id << std::endl;
         }
     }
 
@@ -136,7 +168,10 @@ int main(int argc, char *argv[])
 
     // 6. ETAPA DE ESCRITA BINÁRIA (Chamada ao Módulo Writer)
     // Chama a função de escrita binária (Função movida para mmap_writer.cpp)
-    if (!Compiler::write_mmap_file(final_scene_nodes, glb_file_path))
+    if (!Compiler::write_mmap_file(final_scene_nodes,
+                                   npc_spawn_nodes,
+                                   terrain_meta_data, // <--- NOVO ARGUMENTO ADICIONADO
+                                   glb_file_path))
     {
         return 1;
     }
