@@ -15,6 +15,7 @@ public:
     ~Shader();
 
     void use() const;
+    void unuse() const;
     GLuint getID() const;
 
     void setMat4(const std::string& name, const glm::mat4& value) const; 

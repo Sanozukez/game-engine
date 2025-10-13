@@ -3,12 +3,10 @@
 # do módulo 'physics' ao target principal da engine.
 
 # Adiciona as fontes do módulo 'physics' ao target principal 'engine'.
-target_sources(engine
+target_sources(engine 
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/raycaster.cpp
-    PUBLIC # Headers que definem a interface pública deste módulo
-        ${CMAKE_CURRENT_SOURCE_DIR}/raycaster.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/intersection.h
+    # Adiciona o arquivo de implementação do Raycasting.
+    raycaster.cpp # <--- ADICIONAR ESTA LINHA
 )
 
 # Adiciona o diretório 'physics' como um diretório de inclusão pública para o target 'engine'.

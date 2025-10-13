@@ -9,20 +9,28 @@ add_library(engine STATIC)
 # O PUBLIC garante que qualquer outro projeto que use a 'engine' também encontre o header.
 target_include_directories(engine PUBLIC
     ${json_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/math 
+    ${CMAKE_CURRENT_SOURCE_SOURCE_DIR}/ecs
+    ${CMAKE_CURRENT_SOURCE_DIR}/ecs/components
+    ${CMAKE_CURRENT_SOURCE_DIR}/ecs/systems
+    ${CMAKE_CURRENT_SOURCE_DIR}/camera
 )
 
 # Adiciona subdiretórios.
 # A ordem aqui é importante para dependências de targets (ex: core antes de quem o usa).
 add_subdirectory(core)
+add_subdirectory(math) # Requerido por Vec3/Quat
+add_subdirectory(window)
+add_subdirectory(camera)
 add_subdirectory(input)
 add_subdirectory(render)
-add_subdirectory(ui)
-add_subdirectory(window)
 add_subdirectory(geometry)
 add_subdirectory(asset)
 add_subdirectory(deps)
-add_subdirectory(game)
-add_subdirectory(physics)
+
+# FÍSICA E ECS (A ORDEM CRÍTICA)
+add_subdirectory(physics) # <--- DEVE VIR ANTES DO ECS (PlayerSystem precisa de rayTriangleIntersect)
+add_subdirectory(ecs)     # <--- ONDE PlayerSystem e RenderSystem são definidos
 
 # se todas as fontes .cpp estão sendo adicionadas pelos subdiretórios
 # (como engine/core/CMakeLists.txt e engine/input/CMakeLists.txt fazem).

@@ -117,6 +117,14 @@ namespace Engine
             return ""; // Retorna vazio, que será tratado como erro no getModel
         }
 
+        // Implementação de Verificação de Existência (API Simples)
+        bool AssetManager::isAssetAvailable(uint32_t assetID)
+        {
+            // Verifica se o ID está presente no dicionário de tradução.
+            // Se o ID tem um caminho, ele é considerado "disponível" para carregamento.
+            return m_assetIDToPathMap.count(assetID);
+        }
+
         // =========================================================================
         // 4. CORE LOGIC: CARREGAMENTO DE MODELOS (Recebe o ID)
         // =========================================================================

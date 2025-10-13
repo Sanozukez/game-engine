@@ -7,6 +7,7 @@
 #include "../render/opengl_types.h"
 #include <cstddef> // For offsetof
 #include <format>
+#include <vector>
 
 namespace Engine
 {
@@ -15,7 +16,7 @@ namespace Engine
 
         // --- Mesh Class ---
         Mesh::Mesh(std::vector<Vertex> &&vertices, std::vector<uint32_t> &&indices, std::unique_ptr<Render::Material> material)
-             : m_vertices(std::move(vertices)),
+            : m_vertices(std::move(vertices)),
               m_indices(std::move(indices)),
               m_material(std::move(material))
         {
@@ -62,7 +63,7 @@ namespace Engine
             glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(Vertex), m_vertices.data(), GL_STATIC_DRAW);
 
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indices.size() * sizeof(GLuint), m_indices.data(), GL_STATIC_DRAW);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indices.size() * sizeof(uint32_t), m_indices.data(), GL_STATIC_DRAW);
 
             // Vertex attributes configuration
             // Position (layout = 0)
@@ -82,23 +83,27 @@ namespace Engine
             Engine::Log::Trace(std::format("Mesh: VAO ({}), VBO ({}), EBO ({}) configured.", m_VAO, m_VBO, m_EBO));
         }
 
-        void Mesh::draw(const Render::Shader &shader) const
+        void Engine::Asset::Mesh::draw(Engine::Render::Shader &shader)
         {
+            // 1. Ativar o Shader (passado como argumento)
+            // O Material::activate precisa do Shader para configurar uniforms.
             if (m_material)
             {
-                m_material->activate(shader); // Ativa o material (configura uniforms)
+                // NOTA: O Material deve ser responsável por setar os uniforms específicos dele.
+                m_material->activate(shader);
             }
 
+            // 3. Desenhar
             glBindVertexArray(m_VAO);
             glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, 0);
             glBindVertexArray(0);
 
+            // 4. Desativar
             if (m_material)
             {
-                m_material->deactivate(); // Desativa o material
+                m_material->deactivate();
             }
         }
-
         // --- Model Class ---
         Model::Model() = default;
         Model::~Model() = default;
@@ -116,14 +121,13 @@ namespace Engine
             }
         }
 
-        void Model::draw(const Render::Shader &shader) const
+        void Engine::Asset::Model::draw(Engine::Render::Shader &shader)
         {
-            for (const auto &mesh : m_meshes)
+            // A implementação correta é:
+            for (const auto &mesh_ptr : m_meshes)
             {
-                if (mesh)
-                {
-                    mesh->draw(shader); // Passa o shader para Mesh::draw
-                }
+                // mesh_ptr é um std::unique_ptr<Mesh>, então usamos ->
+                mesh_ptr->draw(shader);
             }
         }
 

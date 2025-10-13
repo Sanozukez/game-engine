@@ -59,6 +59,10 @@ void Shader::use() const
     glUseProgram(ID);
 }
 
+void Shader::unuse() const {
+    glUseProgram(0);
+}
+
 GLuint Shader::getID() const
 {
     return ID;

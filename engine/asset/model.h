@@ -4,7 +4,6 @@
 #include <vector>
 #include <string>
 #include <memory> // Para std::unique_ptr
-// #include <glad/gl.h> // Para GLuint
 
 #include <glm/glm.hpp>
 
@@ -44,8 +43,8 @@ namespace Engine
 
             // Construtor de Cópia para Clone de mesh
             Mesh(const Mesh &other);
-
-            void draw(const Render::Shader &shader) const;
+            
+            void draw(Engine::Render::Shader &shader); 
 
             size_t getVertexCount() const { return m_vertices.size(); }
             size_t getIndexCount() const { return m_indices.size(); }
@@ -86,7 +85,10 @@ namespace Engine
             ~Model();
 
             void addMesh(std::unique_ptr<Mesh> mesh);
-            void draw(const Render::Shader &shader) const; // Desenha todas as meshes do modelo
+
+            // CORREÇÃO CRÍTICA: Precisa aceitar o Shader E a matriz para o ECS
+            // void draw(const Render::Shader &shader, const glm::mat4 &viewProjectionModel) const;
+            void draw(Engine::Render::Shader &shader); 
 
             const std::vector<std::unique_ptr<Mesh>> &getMeshes() const { return m_meshes; }
 

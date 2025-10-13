@@ -34,7 +34,9 @@ struct Material {
 uniform Material uMaterial; 
 
 uniform vec3 uLightPos;            
-uniform vec3 uViewPos;             
+uniform vec3 uViewPos;
+uniform vec3 uLightColor;
+uniform float uLightIntensity;
 
 void main() {
     // 1. Texturas e Fatores Base
@@ -79,8 +81,10 @@ void main() {
     }
 
     // --- PBR Lighting Model (Cook-Torrance) ---
-    vec3 lightColor = vec3(1.0); 
-    float lightIntensity = 30.0; 
+    vec3 lightColor = uLightColor; // Usa o uniform injetado pelo C++
+    float lightIntensity = uLightIntensity;
+    // vec3 lightColor = vec3(1.0); 
+    // float lightIntensity = 30.0; 
 
     vec3 N = normal; 
     vec3 L = normalize(uLightPos); 

@@ -6,7 +6,6 @@
     "fullscreen": false,
     "resizable": false
   },
-
   "camera": {
     "default_type": "orbit",
     "orbit": {
@@ -16,7 +15,6 @@
       "max_pitch_degrees": 15.0
     }
   },
-
   "character": {
     "player": {
       "movement_speed": 5.5,
@@ -24,8 +22,20 @@
       "camera_focus_height": 1.2
     }
   },
-
-   "world": {
-    "start_map_path": "assets/models/test_scene_1.mmap"
-  }  
+  "world": {
+    "start_map_path": "assets/models/test_scene_1.mmap",
+    "global_light": {
+      "position": [
+        50.0,
+        50.0,
+        50.0
+      ],
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "intensity": 30.0
+    }
+  }
 }

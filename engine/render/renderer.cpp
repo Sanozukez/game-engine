@@ -1,10 +1,14 @@
 // engine/render/renderer.cpp
-#include "renderer.h"
-#include "./../window/window.h"
 #include "./shader.h"
+#include "renderer.h"
+#include "../math/transform_utils.h"
+#include "./../window/window.h"
 #include "./../core/log.h"
-#include "./camera/icamera.h"
-#include "./../../src/app/scene.h"
+#include "../camera/icamera.h"
+#include "../ecs/components/transform_component.h" // Para usar Transform no submit
+#include "../asset/asset_manager.h"
+#include "../asset/model.h"
+#include "../core/path_utils.h"
 
 #include "opengl_types.h"
 #include <glm/gtc/matrix_transform.hpp>
@@ -12,67 +16,143 @@
 
 namespace Engine
 {
-
-    // --- MUDANÇA: O construtor aceita uma referência não-constante ---
-    Renderer::Renderer(const Window &window, Camera::ICamera &camera)
-        : m_window(window), m_camera(camera)
+    namespace Render
     {
-        Engine::Log::Info("Renderer: Construtor chamado.");
-    }
 
-    Renderer::~Renderer()
-    {
-        Engine::Log::Info("Renderer: Destrutor chamado.");
-    }
+        // --- MUDANÇA: O construtor aceita uma referência não-constante ---
+        Renderer::Renderer(const Window &window, Camera::ICamera &camera)
+            : m_window(window), m_camera(camera)
+        {
 
-    void Renderer::render(const Scene &scene)
-    {
-        clearScreen();
-        configureViewport();
+            std::string vs_path = Engine::resolveEnginePath("engine/shaders/basic.vert").string();
+            std::string fs_path = Engine::resolveEnginePath("engine/shaders/basic.frag").string();
+            m_defaultShader = std::make_unique<Shader>(vs_path.c_str(), fs_path.c_str());
 
-        // --- MUDANÇA: Atualiza a matriz de projeção da câmera a cada frame ---
-        updateProjectionMatrix();
+            Engine::Log::Info(std::format("Renderer: Construtor chamado. Shader PBR 'basic' inicializado."));
 
-        // Obtém as matrizes de visão e projeção diretamente da câmera
-        glm::mat4 view = m_camera.getViewMatrix();
-        glm::mat4 projection = m_camera.getProjectionMatrix();
+            // FUTURE: Você precisará carregar os arquivos de shader reais aqui.
+        }
 
-        // --- LOG DE DEBUG ADICIONADO ---
-        // Vamos usar Log::Trace para não poluir o console depois.
-        Engine::Log::Trace(std::format("Renderer::render() - View Matrix:\n{}", glm::to_string(view)));
-        Engine::Log::Trace(std::format("Renderer::render() - Projection Matrix:\n{}", glm::to_string(projection)));
-        // --- FIM DO LOG DE DEBUG ---
+        // --- IMPLEMENTAÇÃO DOS NOVOS SETTERS DE LUZ (SOLUÇÃO C2039) ---
 
-        scene.render(projection, view);
-    }
+        void Renderer::setGlobalLightPos(const glm::vec3 &pos)
+        {
+            m_globalLightPos = pos;
+            Engine::Log::Debug(std::format("Renderer: Light Position set to {}.", glm::to_string(pos)));
+        }
 
-    void Renderer::setClearColor(float r, float g, float b, float a)
-    {
-        glClearColor(r, g, b, a);
-        Engine::Log::Debug(std::format("Renderer: Cor de limpeza definida para ({},{},{},{}).", r, g, b, a));
-    }
+        void Renderer::setGlobalLightColor(const glm::vec3 &color)
+        {
+            m_globalLightColor = color;
+            Engine::Log::Debug(std::format("Renderer: Light Color set to {}.", glm::to_string(color)));
+        }
 
-    // --- MUDANÇA: Este método agora configura a câmera ---
-    void Renderer::updateProjectionMatrix()
-    {
-        float aspectRatio = m_window.getAspectRatio();
-        float fov = m_camera.getZoom(); // Usa o FOV (zoom) atual da câmera
+        void Renderer::setGlobalLightIntensity(float intensity)
+        {
+            m_globalLightIntensity = intensity;
+            Engine::Log::Debug(std::format("Renderer: Light Intensity set to {}.", intensity));
+        }
 
-        // Comando para a câmera recalcular e armazenar sua matriz de projeção
-        m_camera.setProjectionMatrix(fov, aspectRatio, 0.1f, 500.0f);
+        Engine::Render::Shader &Renderer::getActiveShader()
+        {
+            // Retorna o shader padrão que foi inicializado no construtor.
+            return *m_defaultShader;
+        }
 
-        Engine::Log::Trace(std::format("Renderer: Matriz de projeção da câmera atualizada. FOV: {}, Aspect: {}.", fov, aspectRatio));
-    }
+        Renderer::~Renderer()
+        {
+            Engine::Log::Info("Renderer: Destrutor chamado.");
+        }
 
-    void Renderer::configureViewport()
-    {
-        glViewport(0, 0, m_window.getWidth(), m_window.getHeight());
-        Engine::Log::Trace(std::format("Renderer: Viewport configurado para {}x{}.", m_window.getWidth(), m_window.getHeight()));
-    }
+        void Renderer::setClearColor(float r, float g, float b, float a)
+        {
+            glClearColor(r, g, b, a);
+            Engine::Log::Debug(std::format("Renderer: Cor de limpeza definida para ({},{},{},{}).", r, g, b, a));
+        }
 
-    void Renderer::clearScreen()
-    {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
+        // **********************************************
+        // NOVOS MÉTODOS DE CONTROLE DE FRAME (ECS)
+        // **********************************************
 
+        void Renderer::beginScene()
+        {
+            // Movendo a lógica de início de frame para cá
+            clearScreen();
+            configureViewport();
+            updateProjectionMatrix();
+
+            // FUTURE: Aqui você deve usar a Câmera para obter a ViewMatrix
+            // e passá-la para o Shader Global. Ex: m_camera.getViewMatrix();
+        }
+
+        void Renderer::endScene()
+        {
+            // Sem lógica complexa aqui por enquanto.
+        }
+
+        // **********************************************
+        // IMPLEMENTAÇÃO ECS: submit (Recebe DADOS puros)
+        // **********************************************
+
+        void Renderer::submit(uint32_t assetID, const ECS::Component::Transform &transform)
+        {
+            std::shared_ptr<Engine::Asset::Model> model = Engine::Asset::AssetManager::Get().getModel(assetID);
+
+            if (model)
+            {
+                // 1. Obter Shader
+                Engine::Render::Shader &shader = getActiveShader();
+                shader.use();
+
+                // 2. Obter Matrizes
+                glm::mat4 projection = m_camera.getProjectionMatrix();
+                glm::mat4 view = m_camera.getViewMatrix();
+
+                // --- CORREÇÃO FINAL: Usar a matriz de transformação completa (T, R e S) ---
+                // A modelMatrix é declarada e inicializada UMA ÚNICA VEZ aqui.
+                glm::mat4 modelMatrix = Engine::Math::getTransformMatrix(transform);
+
+                // 3. ENVIAR MATRIZES
+                shader.setMat4("uProjection", projection);
+                shader.setMat4("uView", view);
+                shader.setMat4("uModel", modelMatrix); // <-- AGORA COM ROTAÇÃO E ESCALA
+
+                // NOVO: Setar as propriedades globais da Fonte de Luz (MIGRADO DO HARDCODE)
+                // Assumimos que o Shader tem as uniforms uLightColor e uLightIntensity.
+                shader.setVec3("uLightPos", m_globalLightPos);
+                shader.setVec3("uLightColor", m_globalLightColor);
+                shader.setFloat("uLightIntensity", m_globalLightIntensity);
+
+                // 4. Setar posição da câmera (para iluminação)
+                shader.setVec3("uViewPos", m_camera.getPosition());
+
+                // 5. Chamar a função de desenho
+                model->draw(shader);
+
+                shader.unuse();
+            }
+        }
+
+        void Renderer::updateProjectionMatrix()
+        {
+            float aspectRatio = m_window.getAspectRatio();
+            float fov = m_camera.getZoom(); // Usa o FOV (zoom) atual da câmera
+
+            // Comando para a câmera recalcular e armazenar sua matriz de projeção
+            m_camera.setProjectionMatrix(fov, aspectRatio, 0.1f, 500.0f);
+
+            Engine::Log::Trace(std::format("Renderer: Matriz de projeção da câmera atualizada. FOV: {}, Aspect: {}.", fov, aspectRatio));
+        }
+
+        void Renderer::configureViewport()
+        {
+            glViewport(0, 0, m_window.getWidth(), m_window.getHeight());
+            Engine::Log::Trace(std::format("Renderer: Viewport configurado para {}x{}.", m_window.getWidth(), m_window.getHeight()));
+        }
+
+        void Renderer::clearScreen()
+        {
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
+    } // namespace Render
 } // namespace Engine

@@ -50,6 +50,9 @@ namespace Engine
             // 1. MÉTODO PRINCIPAL: Recebe o ID Otimizado (uint32_t)
             std::shared_ptr<Model> getModel(uint32_t assetID);
 
+            // 2. NOVO: Verifica se o Asset já está no cache (ou se o ID é válido)
+            bool isAssetAvailable(uint32_t assetID); 
+
             // 2. FUNÇÃO CORE: Traduz ID numérico -> Nome do arquivo
             std::string getAssetPathByID(uint32_t assetID);
 

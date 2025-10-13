@@ -188,7 +188,7 @@ Lista de emoji
 
 cmake -B build
 cmake --build build
-cd build/src/Debug
+cd build/Debug
 ./game-engine.exe
 
 #define GLFW_INCLUDE_NONE
