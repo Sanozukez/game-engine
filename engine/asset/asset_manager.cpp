@@ -29,7 +29,7 @@ namespace Engine
             std::ifstream file(fullPath, std::ios::binary | std::ios::in);
             if (!file.is_open())
             {
-                Engine::Log::Error(std::format("AssetManager: Falha ao abrir o dicionario binario: {}. Usando Fallback.", fullPath));
+                Engine::Core::Log::Error(std::format("AssetManager: Falha ao abrir o dicionario binario: {}. Usando Fallback.", fullPath));
                 return false;
             }
 
@@ -39,7 +39,7 @@ namespace Engine
 
             if (total_count == 0)
             {
-                Engine::Log::Warn("AssetManager: Dicionario binario vazio.");
+                Engine::Core::Log::Warn("AssetManager: Dicionario binario vazio.");
                 return true;
             }
 
@@ -56,7 +56,7 @@ namespace Engine
                 m_assetIDToPathMap[entry.asset_id] = std::string(entry.asset_path);
             }
 
-            Engine::Log::Info(std::format("AssetManager: Dicionario binario carregado com sucesso ({} assets).", total_count));
+            Engine::Core::Log::Info(std::format("AssetManager: Dicionario binario carregado com sucesso ({} assets).", total_count));
             return true;
         }
 
@@ -70,7 +70,7 @@ namespace Engine
             if (!loadAssetDictionary())
             {
                 // Fallback de DEBUG: Se o binário não for encontrado, usa o hardcode como último recurso.
-                Engine::Log::Warn("AssetManager: Usando dicionario de assets de fallback (hardcoded).");
+                Engine::Core::Log::Warn("AssetManager: Usando dicionario de assets de fallback (hardcoded).");
 
                 // Coloque aqui os IDs mínimos essenciais para que o jogo não quebre em DEV.
                 m_assetIDToPathMap[614879287] = "character_placeholder.glb";
@@ -106,7 +106,7 @@ namespace Engine
                 return m_assetIDToPathMap.at(assetID);
             }
 
-            Engine::Log::Error(std::format("AssetManager: ID de Asset {} nao encontrado. Usando ID 0.", assetID));
+            Engine::Core::Log::Error(std::format("AssetManager: ID de Asset {} nao encontrado. Usando ID 0.", assetID));
 
             // Fallback para ID 0 (que deve ser o fallback_asset.glb)
             if (m_assetIDToPathMap.count(0))
@@ -136,14 +136,14 @@ namespace Engine
 
             if (assetName.empty())
             {
-                Engine::Log::Error(std::format("AssetManager: Falha ao obter caminho para ID {}.", assetID));
+                Engine::Core::Log::Error(std::format("AssetManager: Falha ao obter caminho para ID {}.", assetID));
                 return nullptr;
             }
 
             // 2. Checar Cache (A chave de busca no cache ainda é o nome do arquivo)
             if (m_modelCache.count(assetName))
             {
-                Engine::Log::Trace(std::format("AssetManager: Servindo '{}' (ID: {}) do cache.", assetName, assetID));
+                Engine::Core::Log::Trace(std::format("AssetManager: Servindo '{}' (ID: {}) do cache.", assetName, assetID));
                 return m_modelCache.at(assetName);
             }
 
@@ -153,7 +153,7 @@ namespace Engine
 
             if (loadedModel)
             {
-                Engine::Log::Info(std::format("AssetManager: Carregando '{}' do disco. Adicionado ao cache.", assetName));
+                Engine::Core::Log::Info(std::format("AssetManager: Carregando '{}' do disco. Adicionado ao cache.", assetName));
 
                 // Armazenar no Cache (shared_ptr assume o unique_ptr)
                 std::shared_ptr<Model> sharedModel(loadedModel.release());
@@ -162,7 +162,7 @@ namespace Engine
                 return sharedModel;
             }
 
-            Engine::Log::Error(std::format("AssetManager: Falha ao carregar asset '{}' (ID: {}).", assetName, assetID));
+            Engine::Core::Log::Error(std::format("AssetManager: Falha ao carregar asset '{}' (ID: {}).", assetName, assetID));
             return nullptr;
         }
 

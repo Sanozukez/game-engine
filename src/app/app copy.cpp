@@ -43,23 +43,25 @@ using namespace Engine::ECS::Component;
 
 App::App() : m_window(nullptr), m_renderer(nullptr), m_gameWorld(std::make_unique<World>())
 {
-    Engine::Log::Info("[App] Construtor chamado");
+    Engine::Core::Log::Info("[App] Construtor chamado");
 }
 
 App::~App() = default;
 
 void App::run()
 {
-    Engine::Log::Info("[App] Iniciando aplicação");
+    Engine::Core::Log::Info("[App] Iniciando aplicação");
 
-    if (!Engine::ConfigManager::Get().load("config/engine_settings.json"))
+    if (!Engine::Core::ConfigManager::
+Get().load("config/engine_settings.json"))
     {
-        Engine::Log::Critical("[App] Falha ao carregar configurações essenciais. Encerrando.");
+        Engine::Core::Log::Critical("[App] Falha ao carregar configurações essenciais. Encerrando.");
         return;
     }
 
     // --- VARIÁVEIS DE INICIALIZAÇÃO ---
-    auto &config = Engine::ConfigManager::Get();
+    auto &config = Engine::Core::ConfigManager::
+Get();
     Engine::WindowConfig winConfig;
     winConfig.width = config.getValue<int>("window.width", 1280);
     winConfig.height = config.getValue<int>("window.height", 720);
@@ -75,14 +77,14 @@ void App::run()
     }
     catch (const std::exception &e)
     {
-        Engine::Log::Critical(std::format("[App] Erro fatal na inicialização da janela: {}", e.what()));
+        Engine::Core::Log::Critical(std::format("[App] Erro fatal na inicialização da janela: {}", e.what()));
         return;
     }
 
     GLFWwindow *glfwWindow = m_window->getGLFWWindow();
     if (!glfwWindow)
     {
-        Engine::Log::Critical("[App] Ponteiro GLFWwindow inválido após criação da janela.");
+        Engine::Core::Log::Critical("[App] Ponteiro GLFWwindow inválido após criação da janela.");
         return;
     }
     Engine::Input::InputManager::Get().ProcessInput(glfwWindow); // Configura Callbacks GLFW
@@ -106,7 +108,7 @@ void App::run()
 
         m_mainCamera = std::move(orbitCam);
     }
-    Engine::Log::Info(std::format("[App] Câmera inicializada a partir do JSON: {}", cameraType));
+    Engine::Core::Log::Info(std::format("[App] Câmera inicializada a partir do JSON: {}", cameraType));
 
     // NOVO: APLICAÇÃO DOS LIMITES DA CÂMERA DE ÓRBITA
     if (orbitCameraPtr)
@@ -121,7 +123,7 @@ void App::run()
         orbitCameraPtr->setDistanceLimits(minDist, maxDist);
         orbitCameraPtr->setPitchLimits(minPitch, maxPitch);
 
-        Engine::Log::Info(std::format("[App] Limites da OrbitCamera configurados. Distância ({}, {}), Pitch ({}, {})", minDist, maxDist, minPitch, maxPitch));
+        Engine::Core::Log::Info(std::format("[App] Limites da OrbitCamera configurados. Distância ({}, {}), Pitch ({}, {})", minDist, maxDist, minPitch, maxPitch));
     }
 
     m_renderer = std::make_unique<Engine::Render::Renderer>(*m_window, *m_mainCamera.get());
@@ -157,17 +159,17 @@ void App::run()
         rendererRef.setGlobalLightColor(lightColor);
         rendererRef.setGlobalLightIntensity(lightIntensity);
 
-        Engine::Log::Info(std::format("[App] Luz Global carregada de {} com intensidade {}.",
+        Engine::Core::Log::Info(std::format("[App] Luz Global carregada de {} com intensidade {}.",
                                       glm::to_string(lightPos), lightIntensity));
     }
     else
     {
-        Engine::Log::Warn("[App] Nenhuma seção 'world.global_light' encontrada. Usando defaults.");
+        Engine::Core::Log::Warn("[App] Nenhuma seção 'world.global_light' encontrada. Usando defaults.");
         // NOTA: Se os setters de luz foram definidos, você pode querer chamar os setters com os valores padrão aqui.
     }
 
     rendererRef.setClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    Engine::Log::Info("[App] Renderer inicializado e configurado.");
+    Engine::Core::Log::Info("[App] Renderer inicializado e configurado.");
 
     // =========================================================================
     // 3. CONFIGURAÇÃO DO ECS (Sistemas, Entities e Carregamento)
@@ -190,7 +192,7 @@ void App::run()
     // C. CARREGAMENTO DO MUNDO (Ponto de Falha - Chamada Instável)
     if (!Engine::ECS::WorldLoader::Load(*m_gameWorld, playerEntity))
     {
-        Engine::Log::Critical("[App] Falha ao carregar World Loader. Encerrando.");
+        Engine::Core::Log::Critical("[App] Falha ao carregar World Loader. Encerrando.");
         return;
     }
 
@@ -237,7 +239,7 @@ void App::run()
     Engine::Input::InputService::Init(glfwWindow, *m_gameWorld.get());
     Engine::Input::InputService::Get().registerCallbacks(cameraRef);
 
-    Engine::Log::Info("[App] ECS e Sistemas de Input configurados.");
+    Engine::Core::Log::Info("[App] ECS e Sistemas de Input configurados.");
 
     // === LOOP DE RENDERIZAÇÃO ===
     float lastFrame = 0.0f;
@@ -273,6 +275,6 @@ void App::run()
         m_window->swapBuffersAndPollEvents();
     }
 
-    Engine::Log::Info("[App] Encerrando aplicação.");
+    Engine::Core::Log::Info("[App] Encerrando aplicação.");
     glfwTerminate();
 }

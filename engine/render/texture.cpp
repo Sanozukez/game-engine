@@ -25,7 +25,7 @@ namespace Engine
             {
                 // ESSENCIAL: Garante que a liberação seja feita APENAS UMA VEZ
                 glDeleteTextures(1, id_ptr);
-                Engine::Log::Trace(std::format("Texture: Recurso OpenGL (ID: {}) liberado via Custom Deleter.", *id_ptr));
+                Engine::Core::Log::Trace(std::format("Texture: Recurso OpenGL (ID: {}) liberado via Custom Deleter.", *id_ptr));
             }
             delete id_ptr; // Libera a memória do GLuint*
         }
@@ -44,7 +44,7 @@ namespace Engine
         Texture::Texture()
             : m_id_handle(createEmptyHandle()), m_filePath("")
         {
-            Engine::Log::Trace("Texture: Default constructor called (empty handle).");
+            Engine::Core::Log::Trace("Texture: Default constructor called (empty handle).");
         }
 
         Texture::Texture(const std::string &filePath)
@@ -52,7 +52,7 @@ namespace Engine
         {
             if (!loadTexture(filePath))
             {
-                Engine::Log::Error(std::format("Texture: Falha ao carregar textura de '{}'.", filePath));
+                Engine::Core::Log::Error(std::format("Texture: Falha ao carregar textura de '{}'.", filePath));
             }
         }
 
@@ -62,7 +62,7 @@ namespace Engine
         {
             if (!createTextureFromData(width, height, numChannels, data))
             {
-                Engine::Log::Error("Texture: Falha ao carregar textura de dados brutos.");
+                Engine::Core::Log::Error("Texture: Falha ao carregar textura de dados brutos.");
             }
         }
 
@@ -80,7 +80,7 @@ namespace Engine
 
             if (id == 0)
             {
-                Engine::Log::Warn(std::format("Texture: Tentando vincular textura não carregada ('{}').", m_filePath));
+                Engine::Core::Log::Warn(std::format("Texture: Tentando vincular textura não carregada ('{}').", m_filePath));
                 return;
             }
             glActiveTexture(GL_TEXTURE0 + unit);
@@ -112,7 +112,7 @@ namespace Engine
 
             if (!data)
             {
-                Engine::Log::Error(std::format("Texture: Falha ao carregar dados da imagem '{}'. Erro: {}.", filePath, stbi_failure_reason()));
+                Engine::Core::Log::Error(std::format("Texture: Falha ao carregar dados da imagem '{}'. Erro: {}.", filePath, stbi_failure_reason()));
                 return false;
             }
 
@@ -125,7 +125,7 @@ namespace Engine
         {
             if (!data)
             {
-                Engine::Log::Error("Texture: Dados de imagem nulos para criar textura.");
+                Engine::Core::Log::Error("Texture: Dados de imagem nulos para criar textura.");
                 return false;
             }
 
@@ -155,7 +155,7 @@ namespace Engine
             glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D);
 
-            Engine::Log::Info(std::format("Texture: Textura criada de dados brutos ({}x{}, {} canais). ID: {}.",
+            Engine::Core::Log::Info(std::format("Texture: Textura criada de dados brutos ({}x{}, {} canais). ID: {}.",
                                           width, height, numChannels, *m_id_handle));
             return true;
         }
@@ -172,7 +172,7 @@ namespace Engine
             : m_id_handle(std::move(other.m_id_handle)),
               m_filePath(std::move(other.m_filePath))
         {
-            Engine::Log::Trace("Texture: Move-constructor chamado.");
+            Engine::Core::Log::Trace("Texture: Move-constructor chamado.");
         }
 
         Texture &Texture::operator=(Texture &&other) noexcept

@@ -4,9 +4,10 @@
 #include "../../ecs/components/terrain_component.h"
 #include "../../ecs/components/mesh_component.h"
 #include "../../ecs/components/terrain_tracker_component.h"
+#include "../../ecs/components/movement_component.h"
 #include "../../asset/asset_manager.h"
 #include "../../asset/model.h"
-#include "../../physics/raycaster.h" // Assumindo que rayTriangleIntersect está aqui
+#include "../../physics/raycaster.h"
 
 #include <glm/glm.hpp>
 
@@ -27,99 +28,88 @@ namespace Engine
                     return;
                 }
 
+                // NOVO: Obtém o Mesh do Terrain (Componente estático)
                 Component::Mesh &terrainMesh = world.getComponent<Component::Mesh>(terrainID);
+
                 std::shared_ptr<Asset::Model> terrainModel = Asset::AssetManager::Get().getModel(terrainMesh.assetID);
 
                 if (!terrainModel)
                 {
+                    // Se o modelo não carregar, sai do System.
                     return;
                 }
 
-                // 2. Iterar sobre todas as entidades que precisam ser rastreadas (Player e outros)
-                // NOVO: Use a forma tradicional de iteração que funciona em qualquer compilador C++17/20
-                for (auto const &pair : world.getComponents<Component::TerrainTracker>())
+                // 2. Itera sobre o pool de entidades (m_entities) que precisam de tracking.
+                // Requer: Transform e TerrainTracker (conforme registrado no AppSetup).
+                for (const EntityID entityID : m_entities)
                 {
-                    // Acessa EntityID e o Componente explicitamente
-                    const EntityID entityID = pair.first;
-                    // Note que 'tracker' não é usado neste sistema, mas a variável é necessária para a coerência do loop.
-                    // const Component::TerrainTracker &tracker = pair.second;
-
-                    // Certifique-se de que a entidade tem o TransformComponent
-                    if (!world.hasComponent<Component::Transform>(entityID))
-                        continue;
-
-                    // Use getComponent com o tipo explícito
                     Component::Transform &transform = world.getComponent<Component::Transform>(entityID);
+                    Component::TerrainTracker &tracker = world.getComponent<Component::TerrainTracker>(entityID);
 
-                    float focusHeight = 0.0f;
-                    if (world.hasComponent<Component::Movement>(entityID))
+                    std::shared_ptr<Asset::Model> terrainModel = Asset::AssetManager::Get().getModel(terrainMesh.assetID);
+
+                    if (!terrainModel)
                     {
-                        focusHeight = world.getComponent<Component::Movement>(entityID).cameraFocusHeight;
+                        return;
                     }
 
-                    // CÓDIGO MIGRADADO DO BLOCO 6 DO PLAYER SYSTEM
-                    glm::vec3 rayOrigin = glm::vec3(transform.position.x, 
-                                        100.0f, // Use 100.0f como base alta
-                                        transform.position.z);
-                    glm::vec3 rayDirection(0.0f, -1.0f, 0.0f);
-                    float minDistance = std::numeric_limits<float>::max();
-                    bool foundIntersection = false;
-
-                    for (const auto &mesh_ptr : terrainModel->getMeshes())
+                    // 2. Itera sobre o pool de entidades (m_entities) que precisam de tracking. (DIP)
+                    // A Signature garante que todas as entidades aqui têm Transform e TerrainTracker.
+                    for (const EntityID entityID : m_entities)
                     {
-                        // Certifique-se de que os tipos de retorno de getVertices/getIndices são consistentes
-                        // e use const reference para evitar cópia desnecessária.
+                        // Obtém os Componentes necessários (sem checagem, World garante)
+                        Component::Transform &transform = world.getComponent<Component::Transform>(entityID);
+                        // Component::TerrainTracker &tracker = world.getComponent<Component::TerrainTracker>(entityID); // Não é usada diretamente
 
-                        // CORREÇÃO: Usar auto para inferir o tipo, mas como cópia se for o caso do seu sistema
-                        // Mudar para const auto& garante que o tipo é inferido corretamente e não há cópia.
-                        const auto &vertices = mesh_ptr->getVertices();
-                        const auto &indices = mesh_ptr->getIndices();
-
-                        for (size_t i = 0; i < indices.size(); i += 3)
+                        // Lógica para obter a altura de foco, se houver Movement
+                        float focusHeight = 0.0f;
+                        if (world.hasComponent<Component::Movement>(entityID))
                         {
-                            // O acesso por índice deve usar o mesmo tipo de retorno das coleções.
-                            // Certifique-se de que mesh_ptr->getVertices() retorna um container acessível por [].
+                            focusHeight = world.getComponent<Component::Movement>(entityID).cameraFocusHeight;
+                        }
 
-                            // Assumindo que vertices/indices são std::vector:
-                            const glm::vec3 &v0 = vertices[indices[i]].Position;
-                            const glm::vec3 &v1 = vertices[indices[i + 1]].Position;
-                            const glm::vec3 &v2 = vertices[indices[i + 2]].Position;
+                        // CÓDIGO MIGRADADO DO RAYCASTING
+                        glm::vec3 rayOrigin = glm::vec3(transform.position.x,
+                                                        100.0f, // Base alta
+                                                        transform.position.z);
+                        glm::vec3 rayDirection(0.0f, -1.0f, 0.0f);
+                        float minDistance = std::numeric_limits<float>::max();
+                        bool foundIntersection = false;
 
-                            // Assumimos que Engine::Physics::rayTriangleIntersect está globalmente acessível
-                            if (auto distance = Engine::Physics::rayTriangleIntersect(rayOrigin, rayDirection, v0, v1, v2))
+                        // Itera sobre as Meshes do Modelo (Modelo já obtido)
+                        for (const auto &mesh_ptr : terrainModel->getMeshes())
+                        {
+                            const auto &vertices = mesh_ptr->getVertices();
+                            const auto &indices = mesh_ptr->getIndices();
+
+                            for (size_t i = 0; i < indices.size(); i += 3)
                             {
-                                if (*distance < minDistance)
+                                const glm::vec3 &v0 = vertices[indices[i]].Position;
+                                const glm::vec3 &v1 = vertices[indices[i + 1]].Position;
+                                const glm::vec3 &v2 = vertices[indices[i + 2]].Position;
+
+                                if (auto distance = Engine::Physics::rayTriangleIntersect(rayOrigin, rayDirection, v0, v1, v2))
                                 {
-                                    minDistance = *distance;
-                                    foundIntersection = true;
+                                    if (*distance < minDistance)
+                                    {
+                                        minDistance = *distance;
+                                        foundIntersection = true;
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // 3. Aplicar o Ajuste de Altura (Atualiza o Componente Transform)
-                    if (foundIntersection)
-                    {
-                        float groundHeight = rayOrigin.y - minDistance;
-
-                        // --- CORREÇÃO AQUI ---
-                        // Se o modelo tem o ponto pivot (origem) no chão (sola do pé),
-                        // o offset é 0.0f.
-
-                        // Comentamos (ou removemos) a lógica que adicionava o modelHeightOffset:
-                        /*
-                        float modelHeightOffset = 0.0f;
-                        if (world.hasComponent<Component::Movement>(entityID))
+                        // 3. Aplicar o Ajuste de Altura (Atualiza o Componente Transform)
+                        if (foundIntersection)
                         {
-                            modelHeightOffset = world.getComponent<Component::Movement>(entityID).cameraFocusHeight;
+                            float groundHeight = rayOrigin.y - minDistance;
+
+                            // Aplicar a correção: A posição Y do personagem é exatamente a altura do chão.
+                            transform.position.y = groundHeight;
+
+                            // NOTA: A variável cameraFocusHeight ainda é usada no PlayerSystem
+                            // para o m_camera.setTarget(), o que está correto.
                         }
-                        */
-
-                        // Aplicar a correção: A posição Y do personagem é exatamente a altura do chão.
-                        transform.position.y = groundHeight;
-
-                        // NOTA: A variável cameraFocusHeight ainda é usada no PlayerSystem
-                        // para o m_camera.setTarget(), o que está correto.
                     }
                 }
             }

@@ -24,7 +24,7 @@ Shader::Shader(const std::string &vertexPath, const std::string &fragmentPath)
 
     GLint numUniforms = 0;
     glGetProgramiv(ID, GL_ACTIVE_UNIFORMS, &numUniforms);
-    Engine::Log::Debug(std::format("Active uniforms in shader program (ID: {}):\n", ID));
+    Engine::Core::Log::Debug(std::format("Active uniforms in shader program (ID: {}):\n", ID));
     for (GLint i = 0; i < numUniforms; ++i)
     {
         char name[256];
@@ -32,7 +32,7 @@ Shader::Shader(const std::string &vertexPath, const std::string &fragmentPath)
         GLint size;
         GLenum type;
         glGetActiveUniform(ID, i, sizeof(name), &length, &size, &type, name);
-        Engine::Log::Debug(std::format(" - {}", name));
+        Engine::Core::Log::Debug(std::format(" - {}", name));
     }
 
     int success;
@@ -41,7 +41,7 @@ Shader::Shader(const std::string &vertexPath, const std::string &fragmentPath)
     {
         char infoLog[512];
         glGetProgramInfoLog(ID, 512, nullptr, infoLog);
-        Engine::Log::Error(std::format("Error linking shader program:\n{}", infoLog));
+        Engine::Core::Log::Error(std::format("Error linking shader program:\n{}", infoLog));
         throw std::runtime_error("Failed to link shader program.");
     }
 
@@ -86,7 +86,7 @@ GLuint Shader::compileShader(GLenum type, const std::string &source)
     {
         char infoLog[512];
         glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-        Engine::Log::Error(std::format("Error compiling shader:\n{}", infoLog));
+        Engine::Core::Log::Error(std::format("Error compiling shader:\n{}", infoLog));
         throw std::runtime_error("Failed to compile shader.");
     }
 
@@ -96,7 +96,7 @@ GLuint Shader::compileShader(GLenum type, const std::string &source)
 GLint Shader::getUniformLocation(const std::string& name) const {
     GLint location = glGetUniformLocation(ID, name.c_str());
     if (location == -1) {
-        Engine::Log::Warn(std::format("[Shader] Uniform '{}' not found (ID: {}).", name, ID));
+        Engine::Core::Log::Warn(std::format("[Shader] Uniform '{}' not found (ID: {}).", name, ID));
     }
     return location;
 }

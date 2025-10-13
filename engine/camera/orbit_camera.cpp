@@ -1,10 +1,12 @@
 // // engine/camera/orbit_camera.cpp (VERSÃO FINAL E FUNCIONAL)
 #include "orbit_camera.h"
+#include "../core/config_manager.h" // CRÍTICO: Necessário para a definição completa de ConfigManager
+#include "../core/log.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/constants.hpp>
 #include <algorithm>
-#include "./../../../engine/core/log.h"
 #include <glm/gtx/string_cast.hpp>
+
 
 namespace Engine
 {
@@ -19,7 +21,22 @@ namespace Engine
               m_projectionMatrix(1.0f), // Inicializa a matriz de projeção como identidade
               m_lastMouseX(0.0), m_lastMouseY(0.0), m_firstMouse(true)
         {
-            Engine::Log::Info("OrbitCamera: Construtor chamado.");
+            Engine::Core::Log::Info("OrbitCamera: Construtor chamado.");
+        }
+
+        void Engine::Camera::OrbitCamera::applyExternalConfig(const Engine::Core::ConfigManager &config)
+        {
+            // Leitura dos limites da câmera (Lógica migrada do AppSetup!)
+            float minDist = config.getValue<float>("camera.orbit.min_distance", 3.0f);
+            float maxDist = config.getValue<float>("camera.orbit.max_distance", 13.0f);
+            float minPitch = config.getValue<float>("camera.orbit.min_pitch_degrees", -55.0f);
+            float maxPitch = config.getValue<float>("camera.orbit.max_pitch_degrees", 15.0f);
+
+            // Chama os métodos concretos da própria classe
+            setDistanceLimits(minDist, maxDist); 
+            setPitchLimits(minPitch, maxPitch); 
+
+            Engine::Core::Log::Info(std::format("[OrbitCamera] Limites configurados por configuração externa."));
         }
 
         void OrbitCamera::setTarget(const glm::vec3 &target)
@@ -33,7 +50,7 @@ namespace Engine
 
             // A chamada a setRotation já deve ser o suficiente.
 
-            Engine::Log::Debug(std::format("OrbitCamera: Target definido para {}", glm::to_string(target_)));
+            Engine::Core::Log::Debug(std::format("OrbitCamera: Target definido para {}", glm::to_string(target_)));
         }
 
         // REMOVIDO: O método InitializePosition deve ser removido
@@ -41,14 +58,14 @@ namespace Engine
         void OrbitCamera::setDistance(float distance)
         {
             distance_ = glm::clamp(distance, m_minDistance, m_maxDistance);
-            Engine::Log::Debug(std::format("OrbitCamera: Distância definida para {}", distance_));
+            Engine::Core::Log::Debug(std::format("OrbitCamera: Distância definida para {}", distance_));
         }
 
         void OrbitCamera::setRotation(float pitch, float yaw)
         {
             pitch_ = pitch;
             yaw_ = yaw;
-            Engine::Log::Debug(std::format("OrbitCamera: Rotação definida (pitch: {}, yaw: {}).", pitch_, yaw_));
+            Engine::Core::Log::Debug(std::format("OrbitCamera: Rotação definida (pitch: {}, yaw: {}).", pitch_, yaw_));
         }
 
         void OrbitCamera::processMouseMovement(double xpos, double ypos)
@@ -74,13 +91,13 @@ namespace Engine
 
             pitch_ = glm::clamp(pitch_, m_minPitch, m_maxPitch);
 
-            Engine::Log::Trace(std::format("OrbitCamera: Mouse moved (deltaX: {}, deltaY: {}). Pitch: {}, Yaw: {}.", deltaX, deltaY, pitch_, yaw_));
+            Engine::Core::Log::Trace(std::format("OrbitCamera: Mouse moved (deltaX: {}, deltaY: {}). Pitch: {}, Yaw: {}.", deltaX, deltaY, pitch_, yaw_));
         }
 
         void OrbitCamera::processScroll(double yOffset)
         {
             setDistance(distance_ - static_cast<float>(yOffset));
-            Engine::Log::Debug(std::format("OrbitCamera: Processed scroll. New distance: {}.", distance_));
+            Engine::Core::Log::Debug(std::format("OrbitCamera: Processed scroll. New distance: {}.", distance_));
         }
 
         void OrbitCamera::processKeyboard(CameraMovement direction, float deltaTime)
@@ -148,19 +165,19 @@ namespace Engine
         void OrbitCamera::resetMouseState()
         {
             m_firstMouse = true;
-            Engine::Log::Debug("OrbitCamera: Mouse state reset (m_firstMouse = true).");
+            Engine::Core::Log::Debug("OrbitCamera: Mouse state reset (m_firstMouse = true).");
         }
 
         void OrbitCamera::setZoom(float zoom_value)
         {
             m_zoom = glm::clamp(zoom_value, 1.0f, 90.0f);
-            Engine::Log::Debug(std::format("OrbitCamera: Zoom (FOV) definido para {}.", m_zoom));
+            Engine::Core::Log::Debug(std::format("OrbitCamera: Zoom (FOV) definido para {}.", m_zoom));
         }
 
         void OrbitCamera::setYaw(float yaw_degrees)
         {
             yaw_ = glm::radians(yaw_degrees);
-            Engine::Log::Trace(std::format("OrbitCamera: Yaw definido para {} graus.", yaw_degrees));
+            Engine::Core::Log::Trace(std::format("OrbitCamera: Yaw definido para {} graus.", yaw_degrees));
         }
 
         void OrbitCamera::setProjectionMatrix(float fov, float aspectRatio, float nearPlane, float farPlane)

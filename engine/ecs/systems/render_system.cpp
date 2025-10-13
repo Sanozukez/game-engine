@@ -1,4 +1,4 @@
-// // engine/ecs/systems/render_system.cpp (Implementação)
+// // engine/ecs/systems/render_system.cpp (Implementação CORRIGIDA)
 
 #include "render_system.h"
 #include "../../ecs/world.h"                     // O RenderSystem precisa da definição completa do World.
@@ -24,21 +24,17 @@ namespace Engine
                 // 1. Inicia o frame (chamada de baixo nível)
                 m_renderer.beginScene();
 
-                // 2. Itera sobre os Componentes de Transform (Assumimos que o World retorna todos)
-                for (auto const &[entityID, transform] : world.getTransformComponents())
+                // 2. NOVO: Itera sobre a lista de entidades (m_entities) fornecida pelo World.
+                // Esta lista JÁ CONTÉM SOMENTE entidades com Transform e Mesh. (DIP)
+                for (const EntityID entityID : m_entities)
                 {
+                    // 3. Obtém os componentes necessários
+                    // O World GARANTE que esses componentes existem, então usamos getComponent
+                    Component::Transform &transform = world.getComponent<Component::Transform>(entityID);
+                    Component::Mesh &mesh = world.getComponent<Component::Mesh>(entityID);
 
-                    // --- CORREÇÃO DE API CRÍTICA ---
-                    // OLD: if (world.hasMeshComponent(entityID))
-                    if (world.hasComponent<Component::Mesh>(entityID))
-                    { // <--- NOVO TEMPLATE HAS COMPONENT
-
-                        // OLD: Component::Mesh& mesh = world.getMeshComponent(entityID);
-                        Component::Mesh &mesh = world.getComponent<Component::Mesh>(entityID); // <--- NOVO TEMPLATE GET COMPONENT
-
-                        // 4. Envia os dados para o Renderer
-                        m_renderer.submit(mesh.assetID, transform);
-                    }
+                    // 4. Envia os dados para o Renderer
+                    m_renderer.submit(mesh.assetID, transform);
                 }
 
                 // 5. Finaliza o frame

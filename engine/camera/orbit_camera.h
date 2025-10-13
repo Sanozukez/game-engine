@@ -4,6 +4,7 @@
 #include "icamera.h"
 #include <glm/glm.hpp>
 
+
 namespace Engine
 {
     namespace Camera
@@ -38,8 +39,9 @@ namespace Engine
             void setRotation(float pitch, float yaw);
 
             // --- NOVOS MÉTODOS PÚBLICOS DE CONFIGURAÇÃO ---
-            void setDistanceLimits(float min, float max);
-            void setPitchLimits(float minDegrees, float maxDegrees);
+            void setDistanceLimits(float minDistance, float maxDistance) override;
+            void setPitchLimits(float minPitchDegrees, float maxPitchDegrees) override;
+            void applyExternalConfig(const Engine::Core::ConfigManager &config) override; 
 
         private:
             glm::vec3 target_;
@@ -51,7 +53,7 @@ namespace Engine
             double m_lastMouseX;
             double m_lastMouseY;
             bool m_firstMouse;
-            
+
             glm::mat4 m_projectionMatrix;
 
             // --- NOVOS MEMBROS PRIVADOS PARA OS LIMITES ---

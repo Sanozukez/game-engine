@@ -26,9 +26,10 @@ namespace Engine
                 : m_camera(camera),
                   m_inputManager(Engine::Input::InputManager::Get())
             {
-                Engine::Log::Info("CameraSystem: Inicializado. Aplicando setup JSON.");
+                Engine::Core::Log::Info("CameraSystem: Inicializado. Aplicando setup JSON.");
 
-                auto &config = Engine::ConfigManager::Get();
+                auto &config = Engine::Core::ConfigManager::
+Get();
 
                 // --- LÓGICA DE SETUP MIGRADA DO SCENE::INITIALIZE ---
                 if (auto *orbitCam = dynamic_cast<Engine::Camera::OrbitCamera *>(&m_camera))

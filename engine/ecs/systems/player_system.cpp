@@ -30,15 +30,18 @@ namespace Engine
             void PlayerSystem::update(World &world, float dt)
             {
                 // === 1. ENCONTRAR O PLAYER E COMPONENTES ===
-                const EntityID playerID = world.getSingleEntityWith<Component::Player>();
-
-                if (playerID == INVALID_ENTITY_ID)
+                // NOVO: Usamos o pool m_entities do próprio sistema (DIP)
+                if (m_entities.empty())
                 {
                     return;
                 }
 
+                // Assumimos que o PlayerSystem só tem UMA Entity (o Player)
+                const EntityID playerID = *m_entities.begin(); // Pega a primeira (e única) entidade no pool.
+
+                // O World garante a presença dos componentes (Transform, Movement, Player)
                 Component::Movement &movement = world.getComponent<Component::Movement>(playerID);
-                Component::Transform &transform = world.getTransform(playerID);
+                Component::Transform &transform = world.getComponent<Component::Transform>(playerID); // AGORA CORRETO!
 
                 // VARIÁVEIS DE CÁLCULO
                 float velocity = movement.movementSpeed * dt; // Velocidade 1.0x (uniforme)
@@ -91,7 +94,7 @@ namespace Engine
                             // NOVO: Calcula o YAW em RADIANOS a partir da direção do movimento
                             float targetYaw = atan2(horizontalDirection.x, horizontalDirection.z);
                             transform.rotation = Engine::Math::Quat(glm::angleAxis(targetYaw, glm::vec3(0.0f, 1.0f, 0.0f)));
-                            // Engine::Log::Info(...) // Removido Log
+                            // Engine::Core::Log::Info(...) // Removido Log
                         }
                     }
                 }
@@ -121,8 +124,16 @@ namespace Engine
                     // 2. Acumular o Input Bruto (Strafe Q/E e A/D Condicional)
                     bool isADStrafeMode = hasWASInput && isRMBPressed;
 
-                    if (m_inputManager.IsKeyPressed(GLFW_KEY_W)) { rawInputDirection += cameraForwardHorizontal; isMoving = true; }
-                    if (m_inputManager.IsKeyPressed(GLFW_KEY_S)) { rawInputDirection -= cameraForwardHorizontal; isMoving = true; }
+                    if (m_inputManager.IsKeyPressed(GLFW_KEY_W))
+                    {
+                        rawInputDirection += cameraForwardHorizontal;
+                        isMoving = true;
+                    }
+                    if (m_inputManager.IsKeyPressed(GLFW_KEY_S))
+                    {
+                        rawInputDirection -= cameraForwardHorizontal;
+                        isMoving = true;
+                    }
                     if (m_inputManager.IsKeyPressed(GLFW_KEY_Q))
                     {
                         rawInputDirection -= cameraRightHorizontal; // Strafe Esquerdo (Q)

@@ -87,7 +87,7 @@ namespace Engine
                 if (action == GLFW_PRESS)
                 {
                     m_firstMouse = true;
-                    Engine::Log::Debug("InputManager: Botão direito do mouse pressionado. Resetando firstMouse.");
+                    Engine::Core::Log::Debug("InputManager: Botão direito do mouse pressionado. Resetando firstMouse.");
                 }
             }
 

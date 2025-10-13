@@ -35,17 +35,17 @@ std::unique_ptr<Render::Texture> loadGltfTexture(const cgltf_texture* gltfTextur
     if (gltfImage->uri && strncmp(gltfImage->uri, "data:", 5) == 0) {
         // cgltf já decodifica para gltfImage->buffer_view internamente se ela puder.
         // Então, a lógica de buffer_view abaixo deve lidar com isso.
-        Engine::Log::Debug(std::format("GLTFLoader: Textura de imagem embedada (data URI) '{}'.", gltfImage->uri));
+        Engine::Core::Log::Debug(std::format("GLTFLoader: Textura de imagem embedada (data URI) '{}'.", gltfImage->uri));
         // Vamos direto para a lógica de buffer_view
     } 
     
     // **** CORRIGIDO: Lógica COMPLETA para carregar textura de buffer view (dados binários diretos) ****
     if (gltfImage->buffer_view) {
-        Engine::Log::Debug(std::format("GLTFLoader: Tentando carregar textura binária direta (buffer view) para '{}'.", gltfImage->name ? gltfImage->name : "Sem Nome"));
+        Engine::Core::Log::Debug(std::format("GLTFLoader: Tentando carregar textura binária direta (buffer view) para '{}'.", gltfImage->name ? gltfImage->name : "Sem Nome"));
 
         const cgltf_buffer_view* bufferView = gltfImage->buffer_view;
         if (!bufferView->buffer || !bufferView->buffer->data || bufferView->size == 0) {
-            Engine::Log::Error("GLTFLoader: Buffer da imagem binária direta é nulo ou vazio. Dados não disponíveis.");
+            Engine::Core::Log::Error("GLTFLoader: Buffer da imagem binária direta é nulo ou vazio. Dados não disponíveis.");
             return nullptr;
         }
 
@@ -56,7 +56,7 @@ std::unique_ptr<Render::Texture> loadGltfTexture(const cgltf_texture* gltfTextur
             &width, &height, &numChannels, 0); // 0 = default (4 canais se tiver alfa)
 
         if (!data) {
-            Engine::Log::Error(std::format("GLTFLoader: Falha ao carregar dados da imagem binária direta para '{}'. Erro: {}.", 
+            Engine::Core::Log::Error(std::format("GLTFLoader: Falha ao carregar dados da imagem binária direta para '{}'. Erro: {}.", 
                                            gltfImage->name ? gltfImage->name : "Sem Nome", stbi_failure_reason()));
             return nullptr;
         }
@@ -65,7 +65,7 @@ std::unique_ptr<Render::Texture> loadGltfTexture(const cgltf_texture* gltfTextur
         auto texture_obj = std::make_unique<Render::Texture>(width, height, numChannels, data);
         stbi_image_free(data); 
 
-        Engine::Log::Info(std::format("GLTFLoader: Textura binária direta '{}' carregada ({}x{}, {} canais). ID: {}.", 
+        Engine::Core::Log::Info(std::format("GLTFLoader: Textura binária direta '{}' carregada ({}x{}, {} canais). ID: {}.", 
                                       gltfImage->name ? gltfImage->name : "Sem Nome", width, height, numChannels, texture_obj->getID()));
         return texture_obj;
 
@@ -73,11 +73,11 @@ std::unique_ptr<Render::Texture> loadGltfTexture(const cgltf_texture* gltfTextur
     // Se a imagem é externa (URI)
     else if (gltfImage->uri) {
         std::string texturePath = baseDirectory + "/" + gltfImage->uri;
-        Engine::Log::Debug(std::format("GLTFLoader: Tentando carregar textura externa: '{}'", texturePath));
+        Engine::Core::Log::Debug(std::format("GLTFLoader: Tentando carregar textura externa: '{}'", texturePath));
         try {
             return std::make_unique<Render::Texture>(texturePath); 
         } catch (const std::exception& e) {
-            Engine::Log::Error(std::format("GLTFLoader: Erro ao carregar textura externa '{}': {}", texturePath, e.what()));
+            Engine::Core::Log::Error(std::format("GLTFLoader: Erro ao carregar textura externa '{}': {}", texturePath, e.what()));
             return nullptr;
         }
     }
@@ -86,7 +86,7 @@ std::unique_ptr<Render::Texture> loadGltfTexture(const cgltf_texture* gltfTextur
 
 
 std::unique_ptr<Model> GLTFLoader::loadGLTF(const std::string &filePath) {
-    Engine::Log::Info(std::format("GLTFLoader: Tentando carregar modelo GLTF de '{}'", filePath));
+    Engine::Core::Log::Info(std::format("GLTFLoader: Tentando carregar modelo GLTF de '{}'", filePath));
 
     std::filesystem::path fullPath = Engine::resolveEnginePath(filePath);
     std::string baseDirectory = fullPath.parent_path().string(); // Obtém o diretório pai
@@ -99,31 +99,31 @@ std::unique_ptr<Model> GLTFLoader::loadGLTF(const std::string &filePath) {
     cgltf_result result = cgltf_parse_file(&options, fullPath.string().c_str(), &data);
 
     if (result != cgltf_result_success) {
-        Engine::Log::Error(std::format("GLTFLoader: Erro ao parsear GLTF: {}", filePath));
+        Engine::Core::Log::Error(std::format("GLTFLoader: Erro ao parsear GLTF: {}", filePath));
         if (data) { cgltf_free(data); }
         throw std::runtime_error(std::format("GLTFLoader: Falha ao parsear GLTF: {}", filePath));
     }
-    Engine::Log::Debug("GLTFLoader: Parsing inicial do GLTF concluído.");
+    Engine::Core::Log::Debug("GLTFLoader: Parsing inicial do GLTF concluído.");
 
     // **** RE-ADICIONADO: cgltf_load_buffers é essencial para preencher data->buffers[i].data ****
-    Engine::Log::Debug("GLTFLoader: Carregando buffers bin├írios com cgltf_load_buffers...");
+    Engine::Core::Log::Debug("GLTFLoader: Carregando buffers bin├írios com cgltf_load_buffers...");
     result = cgltf_load_buffers(&options, data, fullPath.string().c_str()); 
 
     if (result != cgltf_result_success) {
-        Engine::Log::Error(std::format("GLTFLoader: Erro ao carregar buffers GLTF para '{}'. Código de erro: {}.", 
+        Engine::Core::Log::Error(std::format("GLTFLoader: Erro ao carregar buffers GLTF para '{}'. Código de erro: {}.", 
                                        filePath, static_cast<int>(result)));
         cgltf_free(data);
         throw std::runtime_error(std::format("GLTFLoader: Falha ao carregar buffers GLTF: {}", filePath));
     }
-    Engine::Log::Debug("GLTFLoader: Carregamento de buffers binários GLTF concluído.");
+    Engine::Core::Log::Debug("GLTFLoader: Carregamento de buffers binários GLTF concluído.");
 
 
     auto model = std::make_unique<Model>();
 
-    Engine::Log::Info(std::format("GLTFLoader: Processando {} malhas no GLTF '{}'.", data->meshes_count, filePath));
+    Engine::Core::Log::Info(std::format("GLTFLoader: Processando {} malhas no GLTF '{}'.", data->meshes_count, filePath));
     for (cgltf_size scene_idx = 0; scene_idx < data->scenes_count; ++scene_idx) {
         const cgltf_scene* gltfScene = &data->scenes[scene_idx];
-        Engine::Log::Debug(std::format("GLTFLoader: Processando cena '{}' (nós: {}).", 
+        Engine::Core::Log::Debug(std::format("GLTFLoader: Processando cena '{}' (nós: {}).", 
                                        gltfScene->name ? gltfScene->name : "Sem Nome", gltfScene->nodes_count));
         
         for (cgltf_size node_idx = 0; node_idx < gltfScene->nodes_count; ++node_idx) {
@@ -131,7 +131,7 @@ std::unique_ptr<Model> GLTFLoader::loadGLTF(const std::string &filePath) {
             
             if (gltfNode->mesh) { // Se o nó tem uma malha associada
                 const cgltf_mesh* gltfMesh = gltfNode->mesh;
-                Engine::Log::Debug(std::format("GLTFLoader: Processando malha '{}' do nó '{}' (primitivas: {}).", 
+                Engine::Core::Log::Debug(std::format("GLTFLoader: Processando malha '{}' do nó '{}' (primitivas: {}).", 
                                                gltfMesh->name ? gltfMesh->name : "Sem Nome", 
                                                gltfNode->name ? gltfNode->name : "Sem Nome", gltfMesh->primitives_count));
                 
@@ -202,10 +202,10 @@ std::unique_ptr<Model> GLTFLoader::loadGLTF(const std::string &filePath) {
                                 indices[k] = static_cast<GLuint>(temp_idx);
                             }
                         } else {
-                            Engine::Log::Error(std::format("GLTFLoader: Tipo de componente de índice não suportado para GLTF: {}", static_cast<int>(accessor->component_type))); 
+                            Engine::Core::Log::Error(std::format("GLTFLoader: Tipo de componente de índice não suportado para GLTF: {}", static_cast<int>(accessor->component_type))); 
                         }
                     } else {
-                        Engine::Log::Warn(std::format("GLTFLoader: Primitiva sem índices (malha '{}', primitiva {}). Criando índices sequenciais.",
+                        Engine::Core::Log::Warn(std::format("GLTFLoader: Primitiva sem índices (malha '{}', primitiva {}). Criando índices sequenciais.",
                                                       gltfMesh->name ? gltfMesh->name : "Sem Nome", j));
                         for (cgltf_size k = 0; k < finalVertices.size(); ++k) {
                             indices.push_back(static_cast<GLuint>(k));
@@ -215,7 +215,7 @@ std::unique_ptr<Model> GLTFLoader::loadGLTF(const std::string &filePath) {
                     std::unique_ptr<Render::Material> material = std::make_unique<Render::Material>(); 
                     if (gltfPrimitive->material) {
                         const cgltf_material* gltfMaterial = gltfPrimitive->material;
-                        Engine::Log::Debug(std::format("GLTFLoader: Processando material '{}'.", gltfMaterial->name ? gltfMaterial->name : "Sem Nome"));
+                        Engine::Core::Log::Debug(std::format("GLTFLoader: Processando material '{}'.", gltfMaterial->name ? gltfMaterial->name : "Sem Nome"));
 
                         material->baseColorFactor = glm::vec4(gltfMaterial->pbr_metallic_roughness.base_color_factor[0],
                                                               gltfMaterial->pbr_metallic_roughness.base_color_factor[1],
@@ -237,7 +237,7 @@ std::unique_ptr<Model> GLTFLoader::loadGLTF(const std::string &filePath) {
                         }
                         if (gltfMaterial->pbr_metallic_roughness.metallic_roughness_texture.texture) {
                             material->setRoughnessMap(loadGltfTexture(gltfMaterial->pbr_metallic_roughness.metallic_roughness_texture.texture, baseDirectory));
-                            Engine::Log::Debug("GLTFLoader: Metallic-Roughness map carregado como RoughnessMap. Shader precisa de lógica de separação de canais.");
+                            Engine::Core::Log::Debug("GLTFLoader: Metallic-Roughness map carregado como RoughnessMap. Shader precisa de lógica de separação de canais.");
                         }
                         if (gltfMaterial->occlusion_texture.texture) {
                             material->setAmbientOcclusionMap(loadGltfTexture(gltfMaterial->occlusion_texture.texture, baseDirectory));
@@ -246,26 +246,26 @@ std::unique_ptr<Model> GLTFLoader::loadGLTF(const std::string &filePath) {
                             material->setEmissiveMap(loadGltfTexture(gltfMaterial->emissive_texture.texture, baseDirectory));
                         }
                     } else {
-                        Engine::Log::Debug("GLTFLoader: Primitiva sem material. Usando material padrão.");
+                        Engine::Core::Log::Debug("GLTFLoader: Primitiva sem material. Usando material padrão.");
                     }
 
                     if (!finalVertices.empty() && !indices.empty()) {
                         model->addMesh(std::make_unique<Mesh>(std::move(finalVertices), std::move(indices), std::move(material)));
-                        Engine::Log::Debug(std::format("GLTFLoader: Malha (primitiva {}) adicionada ao modelo. Vértices: {}, Índices: {}.",
+                        Engine::Core::Log::Debug(std::format("GLTFLoader: Malha (primitiva {}) adicionada ao modelo. Vértices: {}, Índices: {}.",
                                                         j, model->getMeshes().back()->getVertexCount(), model->getMeshes().back()->getIndexCount())); 
                     } else {
-                        Engine::Log::Warn(std::format("GLTFLoader: Malha (primitiva {}) não possui vértices ou índices válidos. Ignorando.", j));
+                        Engine::Core::Log::Warn(std::format("GLTFLoader: Malha (primitiva {}) não possui vértices ou índices válidos. Ignorando.", j));
                     }
                 }
             } else {
-                Engine::Log::Debug(std::format("GLTFLoader: Nó '{}' não possui malha associada. Ignorando.", gltfNode->name ? gltfNode->name : "Sem Nome"));
+                Engine::Core::Log::Debug(std::format("GLTFLoader: Nó '{}' não possui malha associada. Ignorando.", gltfNode->name ? gltfNode->name : "Sem Nome"));
             }
         }
     }
 
     cgltf_free(data);
 
-    Engine::Log::Info(std::format("GLTFLoader: Carregamento detalhado de GLTF '{}' concluído. Total de malhas no modelo: {}.",
+    Engine::Core::Log::Info(std::format("GLTFLoader: Carregamento detalhado de GLTF '{}' concluído. Total de malhas no modelo: {}.",
                                   filePath, model->getMeshes().size()));
     return model;
 }

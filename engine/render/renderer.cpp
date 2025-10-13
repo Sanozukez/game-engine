@@ -28,7 +28,7 @@ namespace Engine
             std::string fs_path = Engine::resolveEnginePath("engine/shaders/basic.frag").string();
             m_defaultShader = std::make_unique<Shader>(vs_path.c_str(), fs_path.c_str());
 
-            Engine::Log::Info(std::format("Renderer: Construtor chamado. Shader PBR 'basic' inicializado."));
+            Engine::Core::Log::Info(std::format("Renderer: Construtor chamado. Shader PBR 'basic' inicializado."));
 
             // FUTURE: Você precisará carregar os arquivos de shader reais aqui.
         }
@@ -38,19 +38,19 @@ namespace Engine
         void Renderer::setGlobalLightPos(const glm::vec3 &pos)
         {
             m_globalLightPos = pos;
-            Engine::Log::Debug(std::format("Renderer: Light Position set to {}.", glm::to_string(pos)));
+            Engine::Core::Log::Debug(std::format("Renderer: Light Position set to {}.", glm::to_string(pos)));
         }
 
         void Renderer::setGlobalLightColor(const glm::vec3 &color)
         {
             m_globalLightColor = color;
-            Engine::Log::Debug(std::format("Renderer: Light Color set to {}.", glm::to_string(color)));
+            Engine::Core::Log::Debug(std::format("Renderer: Light Color set to {}.", glm::to_string(color)));
         }
 
         void Renderer::setGlobalLightIntensity(float intensity)
         {
             m_globalLightIntensity = intensity;
-            Engine::Log::Debug(std::format("Renderer: Light Intensity set to {}.", intensity));
+            Engine::Core::Log::Debug(std::format("Renderer: Light Intensity set to {}.", intensity));
         }
 
         Engine::Render::Shader &Renderer::getActiveShader()
@@ -61,13 +61,13 @@ namespace Engine
 
         Renderer::~Renderer()
         {
-            Engine::Log::Info("Renderer: Destrutor chamado.");
+            Engine::Core::Log::Info("Renderer: Destrutor chamado.");
         }
 
         void Renderer::setClearColor(float r, float g, float b, float a)
         {
             glClearColor(r, g, b, a);
-            Engine::Log::Debug(std::format("Renderer: Cor de limpeza definida para ({},{},{},{}).", r, g, b, a));
+            Engine::Core::Log::Debug(std::format("Renderer: Cor de limpeza definida para ({},{},{},{}).", r, g, b, a));
         }
 
         // **********************************************
@@ -141,13 +141,13 @@ namespace Engine
             // Comando para a câmera recalcular e armazenar sua matriz de projeção
             m_camera.setProjectionMatrix(fov, aspectRatio, 0.1f, 500.0f);
 
-            Engine::Log::Trace(std::format("Renderer: Matriz de projeção da câmera atualizada. FOV: {}, Aspect: {}.", fov, aspectRatio));
+            Engine::Core::Log::Trace(std::format("Renderer: Matriz de projeção da câmera atualizada. FOV: {}, Aspect: {}.", fov, aspectRatio));
         }
 
         void Renderer::configureViewport()
         {
             glViewport(0, 0, m_window.getWidth(), m_window.getHeight());
-            Engine::Log::Trace(std::format("Renderer: Viewport configurado para {}x{}.", m_window.getWidth(), m_window.getHeight()));
+            Engine::Core::Log::Trace(std::format("Renderer: Viewport configurado para {}x{}.", m_window.getWidth(), m_window.getHeight()));
         }
 
         void Renderer::clearScreen()

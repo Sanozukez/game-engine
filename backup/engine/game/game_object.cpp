@@ -20,32 +20,32 @@ namespace Engine
         GameObject::GameObject()
             : m_position(0.0f), m_rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), m_scale(1.0f), m_model(nullptr), name("GameObject")
         {
-            Engine::Log::Trace("GameObject: Construtor padrão chamado.");
+            Engine::Core::Log::Trace("GameObject: Construtor padrão chamado.");
         }
 
         GameObject::GameObject(std::unique_ptr<Engine::Asset::Model> model)
             : m_position(0.0f), m_rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), m_scale(1.0f), m_model(std::move(model)), name("GameObject")
         {
-            Engine::Log::Trace(std::format("GameObject: Construtor chamado com modelo."));
+            Engine::Core::Log::Trace(std::format("GameObject: Construtor chamado com modelo."));
         }
 
         void GameObject::setPosition(const glm::vec3 &position)
         {
             m_position = position;
-            Engine::Log::Trace(std::format("GameObject '{}': Posição definida para ({},{},{}).", name, position.x, position.y, position.z));
+            Engine::Core::Log::Trace(std::format("GameObject '{}': Posição definida para ({},{},{}).", name, position.x, position.y, position.z));
         }
 
         void GameObject::setRotation(const glm::quat &rotation)
         {
             m_rotation = rotation;
-            Engine::Log::Trace(std::format("GameObject '{}': Rotação definida por quaternion.", name));
+            Engine::Core::Log::Trace(std::format("GameObject '{}': Rotação definida por quaternion.", name));
         }
 
         void GameObject::setRotationEuler(float pitch_deg, float yaw_deg, float roll_deg)
         {
             glm::vec3 euler_rad = glm::radians(glm::vec3(pitch_deg, yaw_deg, roll_deg));
             m_rotation = glm::quat(euler_rad);
-            Engine::Log::Trace(std::format("GameObject '{}': Rotação definida por Euler (Pitch: {}, Yaw: {}, Roll: {}).", name, pitch_deg, yaw_deg, roll_deg));
+            Engine::Core::Log::Trace(std::format("GameObject '{}': Rotação definida por Euler (Pitch: {}, Yaw: {}, Roll: {}).", name, pitch_deg, yaw_deg, roll_deg));
         }
 
         float GameObject::getRotationYaw() const
@@ -56,13 +56,13 @@ namespace Engine
         void GameObject::setScale(const glm::vec3 &scale)
         {
             m_scale = scale;
-            Engine::Log::Trace(std::format("GameObject '{}': Escala definida para ({},{},{}).", name, scale.x, scale.y, scale.z));
+            Engine::Core::Log::Trace(std::format("GameObject '{}': Escala definida para ({},{},{}).", name, scale.x, scale.y, scale.z));
         }
 
         void GameObject::setScale(float scale)
         {
             m_scale = glm::vec3(scale);
-            Engine::Log::Trace(std::format("GameObject '{}': Escala definida para {}.", name, scale));
+            Engine::Core::Log::Trace(std::format("GameObject '{}': Escala definida para {}.", name, scale));
         }
 
         glm::mat4 GameObject::getTransformMatrix() const
@@ -77,14 +77,14 @@ namespace Engine
         void GameObject::setModel(std::unique_ptr<Engine::Asset::Model> model)
         {
             m_model = std::move(model);
-            Engine::Log::Trace(std::format("GameObject '{}': Modelo definido.", name));
+            Engine::Core::Log::Trace(std::format("GameObject '{}': Modelo definido.", name));
         }
 
         void GameObject::draw(Engine::Render::Shader &shader) 
         {
             // --- LOG DE DEBUG ADICIONADO ---
             glm::mat4 modelMatrix = getTransformMatrix();
-            Engine::Log::Trace(std::format("GameObject::draw() - Desenhando '{}'. Matriz Model:\n{}", name, glm::to_string(modelMatrix)));
+            Engine::Core::Log::Trace(std::format("GameObject::draw() - Desenhando '{}'. Matriz Model:\n{}", name, glm::to_string(modelMatrix)));
             // --- FIM DO LOG ---
             if (m_model)
             {
@@ -103,7 +103,7 @@ namespace Engine
             }
             else
             {
-                Engine::Log::Trace(std::format("GameObject '{}': Sem modelo para desenhar.", name));
+                Engine::Core::Log::Trace(std::format("GameObject '{}': Sem modelo para desenhar.", name));
             }
         }
 

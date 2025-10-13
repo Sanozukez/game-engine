@@ -34,7 +34,7 @@ void PlayerSpawner::Spawn(Engine::Scene& targetScene,
         std::shared_ptr<Engine::Asset::Model> characterModel = assetManager.getModel(characterAssetID);
 
         if (!characterModel) {
-            Engine::Log::Error("PlayerSpawner: Falha ao obter modelo do Player. Pulando spawn.");
+            Engine::Core::Log::Error("PlayerSpawner: Falha ao obter modelo do Player. Pulando spawn.");
             return;
         }
 
@@ -55,22 +55,23 @@ void PlayerSpawner::Spawn(Engine::Scene& targetScene,
         
        characterObject->setPosition(spawnPosition);
 
-        Engine::Log::Info(std::format("Player Spawn: Node encontrado. Posição de destino: ({}, {}, {})", 
+        Engine::Core::Log::Info(std::format("Player Spawn: Node encontrado. Posição de destino: ({}, {}, {})", 
                               spawnPosition.x, spawnPosition.y, spawnPosition.z));
 
         // ... (Configurações JSON: CameraFocusHeight, MovementSpeed, etc.)
-        auto &config = Engine::ConfigManager::Get();
+        auto &config = Engine::Core::ConfigManager::
+Get();
         characterObject->setCameraFocusHeight(config.getValue<float>("character.player.camera_focus_height", 1.0f));
         characterObject->setMovementSpeed(config.getValue<float>("character.player.movement_speed", 5.0f));
         characterObject->setRotationSpeed(config.getValue<float>("character.player.rotation_speed_degrees", 75.0f));
 
         playerCharacter = characterObject.get(); // Atualiza o ponteiro na Scene
         targetScene.addGameObject(std::move(characterObject));
-        Engine::Log::Info("GameObject Personagem carregado e configurado no Spawn Point.");
+        Engine::Core::Log::Info("GameObject Personagem carregado e configurado no Spawn Point.");
     }
     catch (const std::exception &e)
     {
-        Engine::Log::Error(std::format("Erro ao carregar PlayerCharacter: {}", e.what()));
+        Engine::Core::Log::Error(std::format("Erro ao carregar PlayerCharacter: {}", e.what()));
     }
 }
 

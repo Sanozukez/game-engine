@@ -18,7 +18,7 @@ public:
 
     // 1. Inicializa Janela, Configurações de Câmera e Luz (Leitura de JSON)
     static bool InitializeConfiguration(
-        Engine::ConfigManager& config, 
+        Engine::Core::ConfigManager& config, 
         Engine::Render::Renderer& rendererRef, 
         Engine::Camera::ICamera& cameraRef,
         GLFWwindow* glfwWindow);

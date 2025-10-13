@@ -31,14 +31,15 @@ namespace Engine::Game
                                       Engine::Game::GameObject *&terrainObject)
 {
     // 1. CARREGAMENTO DO MAPA (Configuração Dinâmica)
-    auto &config = Engine::ConfigManager::Get();
+    auto &config = Engine::Core::ConfigManager::
+Get();
     std::string mapPath = config.getValue<std::string>("world.start_map_path", "assets/models/default.mmap"); 
 
     Engine::SceneLoader sceneLoader;
     bool loadSuccess = sceneLoader.loadMapBinary(mapPath);
 
     if (!loadSuccess) {
-        Engine::Log::Error("Falha crítica ao carregar arquivo de cena (.mmap).");
+        Engine::Core::Log::Error("Falha crítica ao carregar arquivo de cena (.mmap).");
         return;
     }
 
@@ -83,16 +84,16 @@ namespace Engine::Game
             
             terrainObject = terrainObjectPtr.get();
             targetScene.addGameObject(std::move(terrainObjectPtr));
-            Engine::Log::Info("GameObject Terreno BASE carregado com sucesso!");
+            Engine::Core::Log::Info("GameObject Terreno BASE carregado com sucesso!");
         }
         else
         {
-            Engine::Log::Error(std::format("Falha crítica ao obter Terreno (ID {}). Verifique o dicionário.", terrainAssetID));
+            Engine::Core::Log::Error(std::format("Falha crítica ao obter Terreno (ID {}). Verifique o dicionário.", terrainAssetID));
         }
     }
     else
     {
-        Engine::Log::Error("AVISO: Nenhum Node TER_BASE encontrado para ser o Terreno.");
+        Engine::Core::Log::Error("AVISO: Nenhum Node TER_BASE encontrado para ser o Terreno.");
     }
 
 
@@ -116,7 +117,7 @@ namespace Engine::Game
             if (!baseModel)
             {
                 std::string asset_name_for_log = assetManager.getAssetPathByID(asset_id);
-                Engine::Log::Error(std::format("Falha ao obter modelo '{}' (ID: {}). Pulando instanciação.",
+                Engine::Core::Log::Error(std::format("Falha ao obter modelo '{}' (ID: {}). Pulando instanciação.",
                                                asset_name_for_log, asset_id));
                 continue;
             }
@@ -134,7 +135,7 @@ namespace Engine::Game
         }
     }
     
-    Engine::Log::Info("World Initializer: Carregamento de mapa concluído.");
+    Engine::Core::Log::Info("World Initializer: Carregamento de mapa concluído.");
 }
 
 } // namespace Engine::Game

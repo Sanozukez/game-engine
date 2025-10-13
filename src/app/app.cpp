@@ -33,7 +33,7 @@ using namespace Engine::ECS;
 
 App::App() : m_window(nullptr), m_renderer(nullptr), m_gameWorld(std::make_unique<World>())
 {
-    Engine::Log::Info("[App] Construtor chamado");
+    Engine::Core::Log::Info("[App] Construtor chamado");
 }
 
 App::~App() = default;
@@ -45,13 +45,14 @@ App::~App() = default;
 
 void App::run()
 {
-    Engine::Log::Info("[App] Iniciando aplicação");
+    Engine::Core::Log::Info("[App] Iniciando aplicação");
 
     // --- CARREGAMENTO DE CONFIGURAÇÃO BASE ---
-    auto &config = Engine::ConfigManager::Get();
+    auto &config = Engine::Core::ConfigManager::
+Get();
     if (!config.load("config/engine_settings.json"))
     {
-        Engine::Log::Critical("[App] Falha ao carregar configurações essenciais. Encerrando.");
+        Engine::Core::Log::Critical("[App] Falha ao carregar configurações essenciais. Encerrando.");
         return;
     }
 
@@ -67,7 +68,7 @@ void App::run()
     winConfig.maximized = false;
     
     try { m_window = std::make_unique<Engine::Window>(winConfig); }
-    catch (const std::exception &e) { Engine::Log::Critical(std::format("[App] Erro fatal na inicialização da janela: {}", e.what())); return; }
+    catch (const std::exception &e) { Engine::Core::Log::Critical(std::format("[App] Erro fatal na inicialização da janela: {}", e.what())); return; }
 
     GLFWwindow *glfwWindow = m_window->getGLFWWindow();
     if (!glfwWindow) { return; }
@@ -87,7 +88,7 @@ void App::run()
         // O ponteiro é movido diretamente para m_mainCamera
         m_mainCamera = std::make_unique<Engine::Camera::OrbitCamera>();
     }
-    Engine::Log::Info(std::format("[App] Câmera inicializada a partir do JSON: {}", cameraType));
+    Engine::Core::Log::Info(std::format("[App] Câmera inicializada a partir do JSON: {}", cameraType));
     
     m_renderer = std::make_unique<Engine::Render::Renderer>(*m_window, *m_mainCamera.get());
 
@@ -97,17 +98,17 @@ void App::run()
     
     // ** CHAMADA 1: CONFIGURAÇÃO DE CÂMERA/LUZ **
     if (!Engine::Core::AppSetup::InitializeConfiguration(config, rendererRef, cameraRef, glfwWindow)) {
-        Engine::Log::Critical("[App] Falha na configura├º├úo de Luz/C├ómera. Encerrando.");
+        Engine::Core::Log::Critical("[App] Falha na configura├º├úo de Luz/C├ómera. Encerrando.");
         return;
     }
     
     // ** CHAMADA 2: CRIAÇÃO DE ENTIDADES, LOAD E ADIÇÃO DE SISTEMAS **
     if (!Engine::Core::AppSetup::InitializeECS(*m_gameWorld.get(), cameraRef, rendererRef, glfwWindow)) {
-        Engine::Log::Critical("[App] Falha ao inicializar o ECS/World. Encerrando.");
+        Engine::Core::Log::Critical("[App] Falha ao inicializar o ECS/World. Encerrando.");
         return;
     }
     
-    Engine::Log::Info("[App] Setup completo. Iniciando Game Loop.");
+    Engine::Core::Log::Info("[App] Setup completo. Iniciando Game Loop.");
 
 
     // === LOOP DE RENDERIZAÇÃO ===
@@ -144,7 +145,7 @@ void App::run()
         m_window->swapBuffersAndPollEvents();
     }
 
-    Engine::Log::Info("[App] Encerrando aplicação.");
+    Engine::Core::Log::Info("[App] Encerrando aplicação.");
     glfwTerminate();
 }
 

@@ -23,7 +23,7 @@ namespace Engine
 
         if (!std::filesystem::exists(fullPath))
         {
-            Engine::Log::Error(std::format("PathUtils: Arquivo não encontrado: {}", fullPath.string()));
+            Engine::Core::Log::Error(std::format("PathUtils: Arquivo não encontrado: {}", fullPath.string()));
             throw std::runtime_error("Arquivo não encontrado: " + fullPath.string());
         }
 
@@ -37,14 +37,14 @@ namespace Engine
         std::ifstream file(fullPath);
         if (!file.is_open())
         {
-            Engine::Log::Error(std::format("PathUtils: Erro ao abrir arquivo: {}", fullPath.string()));
+            Engine::Core::Log::Error(std::format("PathUtils: Erro ao abrir arquivo: {}", fullPath.string()));
             throw std::runtime_error("Erro ao abrir arquivo: " + fullPath.string());
         }
 
         std::ostringstream buffer;
         buffer << file.rdbuf();
 
-        Engine::Log::Info(std::format("PathUtils: Arquivo carregado de: {} ({} bytes)", fullPath.string(), buffer.str().size()));
+        Engine::Core::Log::Info(std::format("PathUtils: Arquivo carregado de: {} ({} bytes)", fullPath.string(), buffer.str().size()));
 
         return buffer.str();
     }

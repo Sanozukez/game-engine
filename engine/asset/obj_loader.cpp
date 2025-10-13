@@ -39,14 +39,14 @@ namespace Engine {
 namespace Asset {
 
 std::unique_ptr<Model> ObjLoader::loadModel(const std::string& filePath) {
-    Engine::Log::Info(std::format("ObjLoader: Tentando carregar modelo OBJ de '{}'", filePath));
+    Engine::Core::Log::Info(std::format("ObjLoader: Tentando carregar modelo OBJ de '{}'", filePath));
 
     // Carrega o conteúdo do arquivo OBJ como uma string
     std::string objContent;
     try {
         objContent = Engine::loadFileFromEngineAssets(filePath);
     } catch (const std::exception& e) {
-        Engine::Log::Error(std::format("ObjLoader: Falha ao ler arquivo OBJ: {}", e.what()));
+        Engine::Core::Log::Error(std::format("ObjLoader: Falha ao ler arquivo OBJ: {}", e.what()));
         throw std::runtime_error(std::format("Falha ao carregar modelo OBJ: {}", e.what()));
     }
 
@@ -125,14 +125,14 @@ std::unique_ptr<Model> ObjLoader::loadModel(const std::string& filePath) {
                 newVertex.TexCoords = tempTexCoords[objVert.texCoordIndex];
             } else {
                 newVertex.TexCoords = glm::vec2(0.0f); // Padrão se não houver texCoords
-                Engine::Log::Warn(std::format("ObjLoader: Vértice sem coordenadas de textura. Arquivo: {}", filePath));
+                Engine::Core::Log::Warn(std::format("ObjLoader: Vértice sem coordenadas de textura. Arquivo: {}", filePath));
             }
 
             if (objVert.normalIndex < tempNormals.size()) {
                 newVertex.Normal = tempNormals[objVert.normalIndex];
             } else {
                 newVertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f); // Padrão se não houver normais
-                Engine::Log::Warn(std::format("ObjLoader: Vértice sem normais. Arquivo: {}", filePath));
+                Engine::Core::Log::Warn(std::format("ObjLoader: Vértice sem normais. Arquivo: {}", filePath));
             }
 
             finalVertices.push_back(newVertex);
@@ -142,7 +142,7 @@ std::unique_ptr<Model> ObjLoader::loadModel(const std::string& filePath) {
         }
     }
 
-    Engine::Log::Info(std::format("ObjLoader: Modelo '{}' carregado. Vértices: {}, Índices: {}",
+    Engine::Core::Log::Info(std::format("ObjLoader: Modelo '{}' carregado. Vértices: {}, Índices: {}",
                                   filePath, finalVertices.size(), finalIndices.size()));
     
     // Creates and returns the Model using the loaded data

@@ -21,7 +21,7 @@ namespace Engine
               m_material(std::move(material))
         {
             setupMesh();
-            Engine::Log::Info(std::format("Mesh: Created with {} vertices and {} indices.", m_vertices.size(), m_indices.size()));
+            Engine::Core::Log::Info(std::format("Mesh: Created with {} vertices and {} indices.", m_vertices.size(), m_indices.size()));
         }
 
         Mesh::~Mesh()
@@ -32,7 +32,7 @@ namespace Engine
                 glDeleteBuffers(1, &m_VBO);
                 glDeleteBuffers(1, &m_EBO);
             }
-            Engine::Log::Trace("Mesh: Destructor called. OpenGL resources released.");
+            Engine::Core::Log::Trace("Mesh: Destructor called. OpenGL resources released.");
         }
 
         // NOVO: Construtor de Cópia (Necessário para Model::clone())
@@ -44,7 +44,7 @@ namespace Engine
         {
             // O construtor de cópia exige que os novos buffers OpenGL sejam criados.
             setupMesh();
-            Engine::Log::Trace(std::format("Mesh: Copied (Deep Copy) and new OpenGL buffers created."));
+            Engine::Core::Log::Trace(std::format("Mesh: Copied (Deep Copy) and new OpenGL buffers created."));
         }
 
         void Mesh::setupMesh()
@@ -80,7 +80,7 @@ namespace Engine
             glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Tangent));
 
             glBindVertexArray(0); // Unbind VAO
-            Engine::Log::Trace(std::format("Mesh: VAO ({}), VBO ({}), EBO ({}) configured.", m_VAO, m_VBO, m_EBO));
+            Engine::Core::Log::Trace(std::format("Mesh: VAO ({}), VBO ({}), EBO ({}) configured.", m_VAO, m_VBO, m_EBO));
         }
 
         void Engine::Asset::Mesh::draw(Engine::Render::Shader &shader)
@@ -113,11 +113,11 @@ namespace Engine
             if (mesh)
             {
                 m_meshes.push_back(std::move(mesh));
-                Engine::Log::Trace("Model: Mesh added.");
+                Engine::Core::Log::Trace("Model: Mesh added.");
             }
             else
             {
-                Engine::Log::Warn("Model: Attempting to add null mesh.");
+                Engine::Core::Log::Warn("Model: Attempting to add null mesh.");
             }
         }
 
@@ -152,7 +152,7 @@ namespace Engine
 
             // 3. (Opcional) Copia outros dados do Model (se existirem)
 
-            Engine::Log::Trace(std::format("Model: Clonado com sucesso! {} meshes copiadas.", clonedModel->m_meshes.size()));
+            Engine::Core::Log::Trace(std::format("Model: Clonado com sucesso! {} meshes copiadas.", clonedModel->m_meshes.size()));
             return clonedModel;
         }
 

@@ -51,12 +51,12 @@ namespace Engine
             m_camera = std::make_unique<Engine::Camera::OrbitCamera>();
         }
 
-        Engine::Log::Info(std::format("Engine::Scene::Scene() - Construtor chamado. Câmera inicial a partir do JSON: {}", cameraType));
+        Engine::Core::Log::Info(std::format("Engine::Scene::Scene() - Construtor chamado. Câmera inicial a partir do JSON: {}", cameraType));
     }
 
     Scene::~Scene()
     {
-        Engine::Log::Info("Engine::Scene::~Scene() - Destruindo objetos da cena.");
+        Engine::Core::Log::Info("Engine::Scene::~Scene() - Destruindo objetos da cena.");
     }
 
     void Scene::addGameObject(std::unique_ptr<Engine::Game::GameObject> obj)
@@ -66,15 +66,15 @@ namespace Engine
 
     void Scene::initialize()
     {
-        Engine::Log::Info("Engine::Scene::initialize() - início");
+        Engine::Core::Log::Info("Engine::Scene::initialize() - início");
         try
         {
             shader = std::make_unique<Engine::Render::Shader>("engine/shaders/basic.vert", "engine/shaders/basic.frag");
-            Engine::Log::Info("Shader carregado com sucesso!");
+            Engine::Core::Log::Info("Shader carregado com sucesso!");
         }
         catch (const std::exception &e)
         {
-            Engine::Log::Error(std::format("Erro ao carregar shader: {}", e.what()));
+            Engine::Core::Log::Error(std::format("Erro ao carregar shader: {}", e.what()));
             return;
         }
 
@@ -92,14 +92,15 @@ namespace Engine
                 orbitCam->setTarget(m_playerCharacter->getPosition());
                 orbitCam->setYaw(m_playerCharacter->getRotationYaw());
 
-                auto &config = Engine::ConfigManager::Get();
+                auto &config = Engine::Core::ConfigManager::
+Get();
                 orbitCam->setDistanceLimits(
                     config.getValue<float>("camera.orbit.min_distance", 2.0f),
                     config.getValue<float>("camera.orbit.max_distance", 25.0f));
                 orbitCam->setPitchLimits(
                     config.getValue<float>("camera.orbit.min_pitch_degrees", -20.0f),
                     config.getValue<float>("camera.orbit.max_pitch_degrees", 85.0f));
-                Engine::Log::Info("Limites da OrbitCamera configurados a partir do arquivo JSON.");
+                Engine::Core::Log::Info("Limites da OrbitCamera configurados a partir do arquivo JSON.");
             }
         }
         // Se a câmera for uma FreeCamera, define sua posição inicial.
@@ -108,8 +109,8 @@ namespace Engine
             freeCam->setPosition(glm::vec3(25.0f, 15.0f, 25.0f));
         }
 
-        Engine::Log::Info(std::format("Camera posicionada em {}", glm::to_string(m_camera->getPosition())));
-        Engine::Log::Info("Engine::Scene::initialize() - fim");
+        Engine::Core::Log::Info(std::format("Camera posicionada em {}", glm::to_string(m_camera->getPosition())));
+        Engine::Core::Log::Info("Engine::Scene::initialize() - fim");
     }
 
     void Scene::update(float deltaTime, const Input::InputManager &inputManager)
@@ -129,7 +130,7 @@ namespace Engine
     {
         if (!shader)
         {
-            Engine::Log::Error("Shader não inicializado. Pulando renderização da Engine::Scene.");
+            Engine::Core::Log::Error("Shader não inicializado. Pulando renderização da Engine::Scene.");
             return;
         }
 
@@ -161,7 +162,7 @@ namespace Engine
     void Scene::setCamera(std::unique_ptr<Engine::Camera::ICamera> camera)
     {
         m_camera = std::move(camera);
-        Engine::Log::Info("Scene: Câmera da cena alterada.");
+        Engine::Core::Log::Info("Scene: Câmera da cena alterada.");
     }
 
     Engine::Game::PlayerCharacter *Scene::getPlayer()

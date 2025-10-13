@@ -3,6 +3,15 @@
 
 #include <glm/glm.hpp>
 
+// --- FORWARD DECLARATION CRÍTICA ---
+namespace Engine
+{
+    namespace Core
+    {
+        class ConfigManager;
+    }
+}
+
 namespace Engine
 {
     namespace Camera
@@ -48,8 +57,15 @@ namespace Engine
             virtual void setProjectionMatrix(float fov_degrees, float aspectRatio, float nearPlane, float farPlane) = 0;
             // Retorna a matriz de projeção armazenada
             virtual const glm::mat4 &getProjectionMatrix() const = 0;
-            
+
             virtual glm::mat4 getViewProjectionMatrix() const = 0;
+
+            // NOVO: Usa o nome correto (Engine::Core::ConfigManager)
+            virtual void setDistanceLimits(float minDistance, float maxDistance) = 0;
+            virtual void setPitchLimits(float minPitchDegrees, float maxPitchDegrees) = 0;
+
+            // CRÍTICO: Assinatura correta para a interface
+            virtual void applyExternalConfig(const Engine::Core::ConfigManager &config) = 0;
         };
 
     } // namespace Camera

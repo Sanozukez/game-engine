@@ -1,61 +1,69 @@
 // engine/camera/free_camera.h
 #pragma once // Substituído o #ifndef guard por #pragma once para consistência
 
-#include "icamera.h" 
+#include "icamera.h"
 #include <glm/glm.hpp>
 
-namespace Engine { 
-namespace Camera { 
+namespace Engine
+{
+    namespace Camera
+    {
 
-class FreeCamera : public ICamera { 
-public:
-    FreeCamera();
+        class FreeCamera : public ICamera
+        {
+        public:
+            FreeCamera();
 
-    // Métodos existentes (sobrescritos)
-    void setPosition(const glm::vec3& position) override;
-    glm::mat4 getViewMatrix() const override;
-    void processKeyboard(CameraMovement direction, float deltaTime) override;
-    void processMouseMovement(double xpos, double ypos) override; 
-    void processScroll(double yOffset) override; 
-    float getZoom() const override; 
-    const glm::vec3& getPosition() const override; 
-    glm::vec3 getForwardVector() const override; 
-    glm::vec3 getRightVector() const override;
-    void resetMouseState() override; 
-    void setTarget(const glm::vec3& target) override; 
-    void setZoom(float zoom_value) override; 
-    void setYaw(float yaw_degrees) override;
-    float getYaw() const override;
-    glm::vec3 getTarget() const override; 
+            // Métodos existentes (sobrescritos)
+            void setPosition(const glm::vec3 &position) override;
+            glm::mat4 getViewMatrix() const override;
+            void processKeyboard(CameraMovement direction, float deltaTime) override;
+            void processMouseMovement(double xpos, double ypos) override;
+            void processScroll(double yOffset) override;
+            float getZoom() const override;
+            const glm::vec3 &getPosition() const override;
+            glm::vec3 getForwardVector() const override;
+            glm::vec3 getRightVector() const override;
+            void resetMouseState() override;
+            void setTarget(const glm::vec3 &target) override;
+            void setZoom(float zoom_value) override;
+            void setYaw(float yaw_degrees) override;
+            float getYaw() const override;
+            glm::vec3 getTarget() const override;
 
-    // --- NOVOS MÉTODOS DA INTERFACE IMPLEMENTADOS ---
-    void setProjectionMatrix(float fov_degrees, float aspectRatio, float nearPlane, float farPlane) override;
-    const glm::mat4& getProjectionMatrix() const override;
+            // --- NOVOS MÉTODOS DA INTERFACE IMPLEMENTADOS ---
+            void setProjectionMatrix(float fov_degrees, float aspectRatio, float nearPlane, float farPlane) override;
+            const glm::mat4 &getProjectionMatrix() const override;
 
-    glm::mat4 getViewProjectionMatrix() const override;
+            glm::mat4 getViewProjectionMatrix() const override;
 
-private:
-    glm::vec3 position;
-    glm::vec3 front;
-    glm::vec3 up;
-    glm::vec3 right;
-    glm::vec3 worldUp;
+            // --- ADICIONADOS PARA RESOLVER C2259 E SATISFAZER LSP ---
+            void setDistanceLimits(float minDistance, float maxDistance) override;
+            void setPitchLimits(float minPitchDegrees, float maxPitchDegrees) override;
+            void applyExternalConfig(const Engine::Core::ConfigManager &config) override;
 
-    float yaw; 
-    float pitch;
-    float speed;
-    float sensitivity;
-    float zoom; 
+        private:
+            glm::vec3 position;
+            glm::vec3 front;
+            glm::vec3 up;
+            glm::vec3 right;
+            glm::vec3 worldUp;
 
-    double m_lastMouseX;
-    double m_lastMouseY;
-    bool m_firstMouse;
+            float yaw;
+            float pitch;
+            float speed;
+            float sensitivity;
+            float zoom;
 
-    // --- NOVO MEMBRO ADICIONADO ---
-    glm::mat4 m_projectionMatrix;
+            double m_lastMouseX;
+            double m_lastMouseY;
+            bool m_firstMouse;
 
-    void updateVectors();
-};
+            // --- NOVO MEMBRO ADICIONADO ---
+            glm::mat4 m_projectionMatrix;
 
-} // namespace Camera
+            void updateVectors();
+        };
+
+    } // namespace Camera
 } // namespace Engine

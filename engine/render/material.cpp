@@ -31,37 +31,37 @@ namespace Engine
         {
             m_hasBaseColorMap = (texture != nullptr && texture->isLoaded());
             m_baseColorMap = std::move(texture);
-            Engine::Log::Debug(std::format("Material: BaseColorMap set. Has map: {}.", m_hasBaseColorMap));
+            Engine::Core::Log::Debug(std::format("Material: BaseColorMap set. Has map: {}.", m_hasBaseColorMap));
         }
         void Material::setNormalMap(std::unique_ptr<Texture> texture)
         {
             m_hasNormalMap = (texture != nullptr && texture->isLoaded());
             m_normalMap = std::move(texture);
-            Engine::Log::Debug(std::format("Material: NormalMap set. Has map: {}.", m_hasNormalMap));
+            Engine::Core::Log::Debug(std::format("Material: NormalMap set. Has map: {}.", m_hasNormalMap));
         }
         void Material::setRoughnessMap(std::unique_ptr<Texture> texture)
         {
             m_hasRoughnessMap = (texture != nullptr && texture->isLoaded());
             m_roughnessMap = std::move(texture);
-            Engine::Log::Debug(std::format("Material: RoughnessMap set. Has map: {}.", m_hasRoughnessMap));
+            Engine::Core::Log::Debug(std::format("Material: RoughnessMap set. Has map: {}.", m_hasRoughnessMap));
         }
         void Material::setMetallicMap(std::unique_ptr<Texture> texture)
         {
             m_hasMetallicMap = (texture != nullptr && texture->isLoaded());
             m_metallicMap = std::move(texture);
-            Engine::Log::Debug(std::format("Material: MetallicMap set. Has map: {}.", m_hasMetallicMap));
+            Engine::Core::Log::Debug(std::format("Material: MetallicMap set. Has map: {}.", m_hasMetallicMap));
         }
         void Material::setAmbientOcclusionMap(std::unique_ptr<Texture> texture)
         {
             m_hasAmbientOcclusionMap = (texture != nullptr && texture->isLoaded());
             m_ambientOcclusionMap = std::move(texture);
-            Engine::Log::Debug(std::format("Material: AmbientOcclusionMap set. Has map: {}.", m_hasAmbientOcclusionMap));
+            Engine::Core::Log::Debug(std::format("Material: AmbientOcclusionMap set. Has map: {}.", m_hasAmbientOcclusionMap));
         }
         void Material::setEmissiveMap(std::unique_ptr<Texture> texture)
         {
             m_hasEmissiveMap = (texture != nullptr && texture->isLoaded());
             m_emissiveMap = std::move(texture);
-            Engine::Log::Debug(std::format("Material: EmissiveMap set. Has map: {}.", m_hasEmissiveMap));
+            Engine::Core::Log::Debug(std::format("Material: EmissiveMap set. Has map: {}.", m_hasEmissiveMap));
         }
 
         // Implementação de activate para configurar uniforms do shader

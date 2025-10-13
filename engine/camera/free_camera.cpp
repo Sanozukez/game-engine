@@ -3,6 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include "./../../../engine/core/log.h"
+#include "../core/config_manager.h"
 #include <format>
 
 namespace Engine
@@ -29,7 +30,7 @@ namespace Engine
         void FreeCamera::setPosition(const glm::vec3 &position)
         {
             this->position = position;
-            Engine::Log::Debug(std::format("FreeCamera: Posição definida para {}", glm::to_string(position)));
+            Engine::Core::Log::Debug(std::format("FreeCamera: Posição definida para {}", glm::to_string(position)));
         }
 
         const glm::vec3 &FreeCamera::getPosition() const
@@ -73,7 +74,7 @@ namespace Engine
                 m_lastMouseX = xpos;
                 m_lastMouseY = ypos;
                 m_firstMouse = false;
-                Engine::Log::Debug(std::format("FreeCamera: First mouse movement handled. Initializing lastX: {}, lastY: {}", m_lastMouseX, m_lastMouseY));
+                Engine::Core::Log::Debug(std::format("FreeCamera: First mouse movement handled. Initializing lastX: {}, lastY: {}", m_lastMouseX, m_lastMouseY));
                 return;
             }
 
@@ -122,10 +123,10 @@ namespace Engine
                 position -= worldUp * velocity;
                 break;
             case ROTATE_LEFT:
-                Engine::Log::Trace("FreeCamera: Ignoring ROTATE_LEFT keyboard input.");
+                Engine::Core::Log::Trace("FreeCamera: Ignoring ROTATE_LEFT keyboard input.");
                 break;
             case ROTATE_RIGHT:
-                Engine::Log::Trace("FreeCamera: Ignoring ROTATE_RIGHT keyboard input.");
+                Engine::Core::Log::Trace("FreeCamera: Ignoring ROTATE_RIGHT keyboard input.");
                 break;
             }
         }
@@ -138,7 +139,7 @@ namespace Engine
         void FreeCamera::resetMouseState()
         {
             m_firstMouse = true;
-            Engine::Log::Debug("FreeCamera: Mouse state reset (m_firstMouse = true).");
+            Engine::Core::Log::Debug("FreeCamera: Mouse state reset (m_firstMouse = true).");
         }
 
         void FreeCamera::processScroll(double yOffset)
@@ -148,20 +149,20 @@ namespace Engine
 
         void FreeCamera::setTarget(const glm::vec3 &target)
         {
-            Engine::Log::Warn("FreeCamera: setTarget called, but control is via position. Ignoring or adjusting.");
+            Engine::Core::Log::Warn("FreeCamera: setTarget called, but control is via position. Ignoring or adjusting.");
         }
 
         void FreeCamera::setZoom(float zoom_value)
         {
             zoom = glm::clamp(zoom_value, 1.0f, 90.0f);
-            Engine::Log::Debug(std::format("FreeCamera: Zoom (FOV) definido para {}.", zoom));
+            Engine::Core::Log::Debug(std::format("FreeCamera: Zoom (FOV) definido para {}.", zoom));
         }
 
         void FreeCamera::setYaw(float yaw_degrees)
         {
             yaw = yaw_degrees;
             updateVectors();
-            Engine::Log::Trace(std::format("FreeCamera: Yaw definido para {}.", yaw_degrees));
+            Engine::Core::Log::Trace(std::format("FreeCamera: Yaw definido para {}.", yaw_degrees));
         }
 
         // **** NOVOS: Implementação de getForwardVector e getRightVector ****
@@ -189,6 +190,27 @@ namespace Engine
         {
             // Combina a matriz de projeção (Perspectiva) com a matriz de visão (LookAt)
             return m_projectionMatrix * getViewMatrix();
+        }
+
+        // IMPLEMENTAÇÃO DE CONTRATO (NO-OPs para FreeCamera)
+        void FreeCamera::setDistanceLimits(float minDistance, float maxDistance) {
+            // FreeCamera não tem limites de distância.
+            Engine::Core::Log::Warn("[FreeCamera] Tentativa de aplicar setDistanceLimits; não aplicável.");
+        }
+
+        void FreeCamera::setPitchLimits(float minPitchDegrees, float maxPitchDegrees) {
+            // FreeCamera não tem limites de pitch.
+            Engine::Core::Log::Warn("[FreeCamera] Tentativa de aplicar setPitchLimits; não aplicável.");
+        }
+
+        void FreeCamera::applyExternalConfig(const Engine::Core::ConfigManager &config) {
+            // Este método satisfaz o contrato. Pode ser estendido para ler velocidade, etc.
+            // Para o escopo do erro, basta garantir que ele existe.
+            Engine::Core::Log::Info("[FreeCamera] Configuração externa aplicada (limites ignorados).");
+            
+            // Exemplo de como você poderia ler a velocidade futura (se necessário):
+            // float speed = config.getValue<float>("camera.free.speed", 10.0f);
+            // m_movementSpeed = speed; 
         }
 
     } // namespace Camera
