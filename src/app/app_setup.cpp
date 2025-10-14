@@ -10,6 +10,13 @@
 #include "./../../ecs/components/all_components.h" // Incluir todos os componentes
 #include "./../../ecs/components/component_signature.h"
 #include "./../../camera/orbit_camera.h" // <--- INCLUSÃO CRÍTICA (OrbitCamera)
+#include "../../ecs/components/camera_input_component.h"
+
+
+#include "./../../input/i_keyboard_listener.h"
+#include "./../../input/i_mouse_listener.h"
+#include "./../../input/i_scroll_listener.h"
+#include "./../../ecs/systems/camera_input_system.h"
 
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -41,24 +48,7 @@ namespace Engine
             // NOVO: Ponteiro temporário para acessar métodos específicos da OrbitCamera.
             Engine::Camera::OrbitCamera *orbitCameraPtr = nullptr;
 
-            // Tenta obter o OrbitCamera* com cast seguro.
-            // (O erro getType foi resolvido, pois vamos fazer o dynamic_cast direto)
-            // orbitCameraPtr = dynamic_cast<Engine::Camera::OrbitCamera *>(&cameraRef);
-
-            // // Lógica para carregar limites da OrbitCamera
-            // if (orbitCameraPtr)
-            // {
-            //     // Leitura dos limites da câmera
-            //     float minDist = config.getValue<float>("camera.orbit.min_distance", 3.0f);
-            //     float maxDist = config.getValue<float>("camera.orbit.max_distance", 13.0f);
-            //     float minPitch = config.getValue<float>("camera.orbit.min_pitch_degrees", -55.0f);
-            //     float maxPitch = config.getValue<float>("camera.orbit.max_pitch_degrees", 15.0f);
-
-            //     orbitCameraPtr->setDistanceLimits(minDist, maxDist);
-            //     orbitCameraPtr->setPitchLimits(minPitch, maxPitch);
-            //     Log::Info(std::format("[AppSetup] Limites da OrbitCamera configurados."));
-            // }
-            cameraRef.applyExternalConfig(config); 
+            cameraRef.applyExternalConfig(config);
 
             // --- CARREGAR LUZ GLOBAL (CORRIGIDO PARA USO DE JSON SEGURO) ---
             const auto &rootNode = config.getRootNode();
@@ -100,7 +90,7 @@ namespace Engine
             using namespace Engine::ECS::Component;
             using namespace Engine::ECS;
 
-            // === 1. REGISTRO DE COMPONENTES E ENTIDADES (INALTERADO) ===
+            // --- 1. CONFIGURAÇÃO BASE (Componentes, Entidades, Carregamento) ---
             world.registerComponent<Transform>();
             world.registerComponent<Mesh>();
             world.registerComponent<Player>();
@@ -108,9 +98,9 @@ namespace Engine
             world.registerComponent<Terrain>();
             world.registerComponent<TerrainTracker>();
             world.registerComponent<CameraTarget>();
+            world.registerComponent<CameraInput>();
             Log::Info("[AppSetup] Todos os Componentes ECS registrados com sucesso.");
 
-            // A. CRIAÇÃO DA ENTIDADE PLAYER (Continua adicionando Transform explicitamente)
             Engine::ECS::EntityID playerEntity = world.createEntity();
             const uint32_t PLAYER_ASSET_ID = 614879287;
             world.addComponent<Transform>(playerEntity);
@@ -119,49 +109,72 @@ namespace Engine
             world.addComponent<Player>(playerEntity);
             world.addComponent<Movement>(playerEntity);
             world.addComponent<TerrainTracker>(playerEntity);
+            world.addComponent<CameraInput>(playerEntity);
 
-            // C. CARREGAMENTO DO MUNDO (Que dispara addComponent, atualizando signatures)
             if (!Engine::ECS::WorldLoader::Load(world, playerEntity))
             {
                 Log::Critical("[AppSetup] Falha ao carregar World Loader.");
                 return false;
             }
 
-            // === 2. ADIÇÃO DOS SISTEMAS E REGISTRO DAS ASSINATURAS (CRÍTICO) ===
-            // CORREÇÃO: ADICIONAR ESTA DECLARAÇÃO
+            // D. INICIALIZAÇÃO DO INPUT (ANTES DE TUDO)
+            Engine::Input::InputService::Init(glfwWindow, world);
+            Engine::Input::InputManager &inputManagerRef = Engine::Input::InputManager::Get();
             Engine::ECS::ComponentTypeManager &typeManager = Engine::ECS::ComponentTypeManager::Get();
+            Engine::Input::InputService &inputService = Engine::Input::InputService::Get(); // Referência única
 
+            // --- 2. ADIÇÃO DOS SYSTEMS E REGISTRO DAS ASSINATURAS (FLUXO ÚNICO) ---
+
+            // 1. CAMERA INPUT SYSTEM (Lida com o input da Câmera)
+            // CRÍTICO: World::addSystem constrói o objeto no heap e o gerencia.
+            // world.addSystem<Engine::ECS::System::CameraInputSystem>(cameraRef, inputManagerRef, inputService);
+            world.addSystem<Engine::ECS::System::CameraInputSystem>(world, cameraRef, inputManagerRef, inputService);
+
+
+            Engine::ECS::System::CameraInputSystem *camInputSystemPtr =
+                world.getSystem<Engine::ECS::System::CameraInputSystem>();
+
+            if (camInputSystemPtr == nullptr)
+            {
+                Log::Critical("Falha ao inicializar CameraInputSystem.");
+                return false;
+            }
+
+            // REGISTRO DE LISTENERS NO INPUT SERVICE (ISP)
+            inputService.registerKeyboardListener(camInputSystemPtr);
+            inputService.registerMouseListener(camInputSystemPtr);
+            inputService.registerScrollListener(camInputSystemPtr);
+            inputService.registerMouseButtonListener(camInputSystemPtr);
+
+            // REGISTRO DA ASSINATURA (Não requer Componentes)
+            world.registerSystemSignature<Engine::ECS::System::CameraInputSystem>(ComponentSignature());
+
+            // 2. REGISTRO DOS OUTROS SYSTEMS
             // -- RENDER SYSTEM --
-            // Requer: Transform e Mesh
             ComponentSignature renderSignature;
             renderSignature.set(typeManager.getTypeID<Transform>());
             renderSignature.set(typeManager.getTypeID<Mesh>());
             world.addSystem<RenderSystem>(rendererRef);
-            world.registerSystemSignature<RenderSystem>(renderSignature); // REGISTRO!
+            world.registerSystemSignature<RenderSystem>(renderSignature);
 
             // -- PLAYER SYSTEM --
-            // Requer: Transform, Movement e Player
             ComponentSignature playerSignature;
             playerSignature.set(typeManager.getTypeID<Transform>());
             playerSignature.set(typeManager.getTypeID<Movement>());
             playerSignature.set(typeManager.getTypeID<Player>());
             world.addSystem<PlayerSystem>(cameraRef);
-            world.registerSystemSignature<PlayerSystem>(playerSignature); // REGISTRO!
+            world.registerSystemSignature<PlayerSystem>(playerSignature);
 
             // -- TERRAIN TRACKING SYSTEM --
-            // Requer: Transform e TerrainTracker
             ComponentSignature terrainTrackingSignature;
             terrainTrackingSignature.set(typeManager.getTypeID<Transform>());
             terrainTrackingSignature.set(typeManager.getTypeID<TerrainTracker>());
             world.addSystem<TerrainTrackingSystem>();
-            world.registerSystemSignature<TerrainTrackingSystem>(terrainTrackingSignature); // REGISTRO!
+            world.registerSystemSignature<TerrainTrackingSystem>(terrainTrackingSignature);
 
-            // === CORREÇÃO DE FRAME 0 (Frame-perfect sync) ===
+            // --- 3. EXECUÇÃO DE FRAME 0 E SETUP DA CÂMERA (SYNC CRÍTICO) ---
 
-            Component::Transform &currentTransform = world.getComponent<Component::Transform>(playerEntity);
-            Component::Movement &playerMovement = world.getComponent<Component::Movement>(playerEntity);
-
-            // 1. Força a correção do Y
+            // 1. Força a correção do Y (TerrainTrackingSystem)
             TerrainTrackingSystem *terrainSystem = world.getSystem<TerrainTrackingSystem>();
             if (terrainSystem)
             {
@@ -169,6 +182,9 @@ namespace Engine
             }
 
             // 2. APLICAÇÃO DE YAW E TARGET (Configuração da Câmera)
+            Component::Transform &currentTransform = world.getComponent<Component::Transform>(playerEntity);
+            Component::Movement &playerMovement = world.getComponent<Component::Movement>(playerEntity);
+
             glm::quat playerQuat = currentTransform.rotation;
             float playerYawDegrees = glm::degrees(glm::yaw(playerQuat));
             glm::vec3 spawnPosGLM = currentTransform.position.toGLM();
@@ -177,11 +193,9 @@ namespace Engine
 
             cameraRef.setYaw(playerYawDegrees);
             cameraRef.setTarget(initialTargetPoint);
-            cameraRef.resetMouseState();
 
-            // REGISTRO DE CALLBACKS BÁSICOS
-            Engine::Input::InputService::Init(glfwWindow, world);
-            Engine::Input::InputService::Get().registerCallbacks(cameraRef);
+            // 3. LIGA OS CALLBACKS GLFW (DEPOIS DE CONFIGURAR TUDO)
+            inputService.setupAllCallbacks();
 
             return true;
         }

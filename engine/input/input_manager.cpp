@@ -64,18 +64,23 @@ namespace Engine
         void InputManager::processKeyEvent(int key, int action)
         {
             if (key >= 0 && key < 1024)
-            {
                 m_keyStates[key] = (action == GLFW_PRESS || action == GLFW_REPEAT);
-            }
 
-            InputEvent event = (action == GLFW_PRESS || action == GLFW_REPEAT) ? InputEvent::KeyPressed : InputEvent::KeyReleased;
+            InputEvent event = (action == GLFW_PRESS || action == GLFW_REPEAT)
+                                   ? InputEvent::KeyPressed
+                                   : InputEvent::KeyReleased;
             InputEventData data = {key, 0.0, 0.0, 0.0, 0.0, m_rightMousePressed};
-            if (callbacks_.count(event) && callbacks_[event].count(key))
+
+            if (callbacks_.count(event))
             {
-                for (const auto &callback : callbacks_[event][key])
-                {
-                    callback(data);
-                }
+                // 1) callbacks registrados para a tecla específica
+                if (callbacks_[event].count(key))
+                    for (const auto &cb : callbacks_[event][key])
+                        cb(data);
+                // 2) callbacks “coringa” (key == 0)
+                if (callbacks_[event].count(0))
+                    for (const auto &cb : callbacks_[event][0])
+                        cb(data);
             }
         }
 
@@ -87,18 +92,25 @@ namespace Engine
                 if (action == GLFW_PRESS)
                 {
                     m_firstMouse = true;
-                    Engine::Core::Log::Debug("InputManager: Botão direito do mouse pressionado. Resetando firstMouse.");
+                    Engine::Core::Log::Debug("InputManager: Botão direito pressionado. Resetando firstMouse interno.");
                 }
             }
 
-            InputEvent event = (action == GLFW_PRESS) ? InputEvent::MouseButtonPressed : InputEvent::MouseButtonReleased;
+            InputEvent event = (action == GLFW_PRESS)
+                                   ? InputEvent::MouseButtonPressed
+                                   : InputEvent::MouseButtonReleased;
             InputEventData data = {button, 0.0, 0.0, 0.0, 0.0, m_rightMousePressed};
-            if (callbacks_.count(event) && callbacks_[event].count(button))
+
+            if (callbacks_.count(event))
             {
-                for (const auto &callback : callbacks_[event][button])
-                {
-                    callback(data);
-                }
+                // 1) callbacks para o botão específico (0=LMB, 1=RMB, 2=MMB)
+                if (callbacks_[event].count(button))
+                    for (const auto &cb : callbacks_[event][button])
+                        cb(data);
+                // 2) callbacks “coringa” (key == 0)
+                if (callbacks_[event].count(0))
+                    for (const auto &cb : callbacks_[event][0])
+                        cb(data);
             }
         }
 
@@ -106,6 +118,8 @@ namespace Engine
         {
             m_lastMouseX = xpos;
             m_lastMouseY = ypos;
+
+            // Engine::Core::Log::Trace(std::format("[INPUT] MouseMoved raw xpos={}, ypos={}, rightPressed={}", xpos, ypos, m_rightMousePressed));
 
             InputEventData data = {0, xpos, ypos, 0.0, 0.0, m_rightMousePressed};
             if (callbacks_.count(InputEvent::MouseMoved) && callbacks_[InputEvent::MouseMoved].count(0))

@@ -143,7 +143,7 @@ namespace Engine
             // 2. Checar Cache (A chave de busca no cache ainda é o nome do arquivo)
             if (m_modelCache.count(assetName))
             {
-                Engine::Core::Log::Trace(std::format("AssetManager: Servindo '{}' (ID: {}) do cache.", assetName, assetID));
+                // Engine::Core::Log::Trace(std::format("AssetManager: Servindo '{}' (ID: {}) do cache.", assetName, assetID));
                 return m_modelCache.at(assetName);
             }
 

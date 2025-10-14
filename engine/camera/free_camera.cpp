@@ -1,217 +1,203 @@
 // engine/camera/free_camera.cpp
 #include "free_camera.h"
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/string_cast.hpp>
-#include "./../../../engine/core/log.h"
-#include "../core/config_manager.h"
-#include <format>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtx/compatibility.hpp>   // glm::clamp para floats
+#include <cmath>
 
-namespace Engine
-{
-    namespace Camera
-    {
+namespace Engine {
+namespace Camera {
 
-        FreeCamera::FreeCamera()
-            : position(glm::vec3(0.0f, 1.0f, 5.0f)),
-              worldUp(glm::vec3(0.0f, 1.0f, 0.0f)),
-              yaw(0.0f),
-              pitch(0.0f),
-              speed(5.0f),
-              sensitivity(0.1f),
-              zoom(45.0f),
-              m_projectionMatrix(1.0f), // --- NOVO: Inicializa a matriz de projeção ---
-              m_lastMouseX(0.0),
-              m_lastMouseY(0.0),
-              m_firstMouse(true)
-        {
-            updateVectors();
-        }
+// ---- Helpers internos ----
+static inline float rad2deg(float r) { return r * (180.0f / glm::pi<float>()); }
+static inline float deg2rad(float d) { return d * (glm::pi<float>() / 180.0f); }
 
-        void FreeCamera::setPosition(const glm::vec3 &position)
-        {
-            this->position = position;
-            Engine::Core::Log::Debug(std::format("FreeCamera: Posição definida para {}", glm::to_string(position)));
-        }
+// ---------------------------------
+// Ctor
+// ---------------------------------
+FreeCamera::FreeCamera() {
+    rebuildProjection();
+    updateVectors();
+}
 
-        const glm::vec3 &FreeCamera::getPosition() const
-        {
-            return position;
-        }
+// ---------------------------------
+// ICamera: Matrizes
+// ---------------------------------
+glm::mat4 FreeCamera::getViewMatrix() const {
+    return glm::lookAt(m_position, m_position + m_front, m_up);
+}
 
-        glm::vec3 FreeCamera::getTarget() const
-        {
-            // Retorna a posição atual + o vetor forward (para onde a câmera está olhando)
-            // Usamos a variável de membro correta que você tem: position.
-            return position + front;
-        }
+glm::mat4 FreeCamera::getProjectionMatrix() const {
+    return m_projection; // retorno por valor, como no .h
+}
 
-        float FreeCamera::getZoom() const
-        {
-            return zoom;
-        }
+glm::mat4 FreeCamera::getViewProjectionMatrix() const {
+    return m_projection * getViewMatrix();
+}
 
-        float FreeCamera::getYaw() const
-        {
-            return yaw;
-        }
+// ---------------------------------
+// ICamera: Consulta de estado
+// ---------------------------------
+float FreeCamera::getZoom() const {
+    return m_fovDeg; // tratamos "zoom" como FOV (graus)
+}
 
-        void FreeCamera::updateVectors()
-        {
-            glm::vec3 newFront;
-            newFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-            newFront.y = sin(glm::radians(pitch));
-            newFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-            front = glm::normalize(newFront);
+const glm::vec3& FreeCamera::getPosition() const {
+    return m_position;
+}
 
-            right = glm::normalize(glm::cross(front, worldUp));
-            up = glm::normalize(glm::cross(right, front));
-        }
+glm::vec3 FreeCamera::getForwardVector() const {
+    return glm::normalize(m_front);
+}
 
-        void FreeCamera::processMouseMovement(double xpos, double ypos)
-        {
-            if (m_firstMouse)
-            {
-                m_lastMouseX = xpos;
-                m_lastMouseY = ypos;
-                m_firstMouse = false;
-                Engine::Core::Log::Debug(std::format("FreeCamera: First mouse movement handled. Initializing lastX: {}, lastY: {}", m_lastMouseX, m_lastMouseY));
-                return;
-            }
+glm::vec3 FreeCamera::getRightVector() const {
+    return glm::normalize(m_right);
+}
 
-            float deltaX = static_cast<float>(xpos - m_lastMouseX);
-            float deltaY = static_cast<float>(m_lastMouseY - ypos);
+float FreeCamera::getYaw() const {
+    return m_yawDeg;
+}
 
-            m_lastMouseX = xpos;
-            m_lastMouseY = ypos;
+float FreeCamera::getPitch() const {
+    return m_pitchDeg;
+}
 
-            deltaX *= sensitivity;
-            deltaY *= sensitivity;
+glm::vec3 FreeCamera::getTarget() const {
+    return m_position + m_front;
+}
 
-            yaw += deltaX;
-            pitch += deltaY;
+// ---------------------------------
+// ICamera: Mutação de estado
+// ---------------------------------
+void FreeCamera::setPosition(const glm::vec3& position) {
+    m_position = position;
+}
 
-            if (pitch > 89.0f)
-                pitch = 89.0f;
-            if (pitch < -89.0f)
-                pitch = -89.0f;
+void FreeCamera::setTarget(const glm::vec3& target) {
+    // Reorienta para olhar o alvo, preservando a posição
+    glm::vec3 dir = glm::normalize(target - m_position);
+    // Yaw: ângulo no plano XZ, medido a partir do +Z (para ser consistente com updateVectors)
+    // Pitch: inclinação para cima/baixo
+    m_pitchDeg = rad2deg(std::asin(glm::clamp(dir.y, -1.0f, 1.0f)));
+    // atan2(sinYaw, cosYaw) conforme a convenção usada em updateVectors (z leva o cos, x leva o sin)
+    m_yawDeg = rad2deg(std::atan2(dir.z, dir.x)) - 90.0f; // equivalência com a fórmula de updateVectors
+    // Ajusta vetores
+    updateVectors();
+}
 
-            updateVectors();
-        }
+void FreeCamera::setZoom(float zoom_value) {
+    m_fovDeg = glm::clamp(zoom_value, 1.0f, 90.0f);
+    rebuildProjection();
+}
 
-        void FreeCamera::processKeyboard(CameraMovement direction, float deltaTime)
-        {
-            float velocity = speed * deltaTime;
+void FreeCamera::setYaw(float yaw_degrees) {
+    m_yawDeg = yaw_degrees;
+    updateVectors();
+}
 
-            switch (direction)
-            {
-            case FORWARD:
-                position += front * velocity;
-                break;
-            case BACKWARD:
-                position -= front * velocity;
-                break;
-            case LEFT:
-                position -= right * velocity;
-                break;
-            case RIGHT:
-                position += right * velocity;
-                break;
-            case UP:
-                position += worldUp * velocity;
-                break;
-            case DOWN:
-                position -= worldUp * velocity;
-                break;
-            case ROTATE_LEFT:
-                Engine::Core::Log::Trace("FreeCamera: Ignoring ROTATE_LEFT keyboard input.");
-                break;
-            case ROTATE_RIGHT:
-                Engine::Core::Log::Trace("FreeCamera: Ignoring ROTATE_RIGHT keyboard input.");
-                break;
-            }
-        }
+void FreeCamera::setPitch(float pitch_degrees) {
+    m_pitchDeg = glm::clamp(pitch_degrees, -89.0f, 89.0f);
+    updateVectors();
+}
 
-        glm::mat4 FreeCamera::getViewMatrix() const
-        {
-            return glm::lookAt(position, position + front, up);
-        }
+// ---------------------------------
+// ICamera: Projeção
+// ---------------------------------
+void FreeCamera::setProjectionMatrix(float fov_degrees,
+                                     float aspectRatio,
+                                     float nearPlane,
+                                     float farPlane) {
+    m_fovDeg = fov_degrees;
+    m_aspect = aspectRatio;
+    m_near   = nearPlane;
+    m_far    = farPlane;
+    rebuildProjection();
+}
 
-        void FreeCamera::resetMouseState()
-        {
-            m_firstMouse = true;
-            Engine::Core::Log::Debug("FreeCamera: Mouse state reset (m_firstMouse = true).");
-        }
+// ---------------------------------
+// ICamera: Input
+// ---------------------------------
+void FreeCamera::processKeyboard(CameraMovement direction, float dt) {
+    const float vel = m_moveSpeed * dt;
 
-        void FreeCamera::processScroll(double yOffset)
-        {
-            // FreeCamera não usa scroll para zoom, então deixamos vazio.
-        }
+    switch (direction) {
+        case FORWARD:  m_position += m_front * vel;           break;
+        case BACKWARD: m_position -= m_front * vel;           break;
+        case LEFT:     m_position -= m_right * vel;           break;
+        case RIGHT:    m_position += m_right * vel;           break;
+        case UP:       m_position += m_worldUp * vel;         break;
+        case DOWN:     m_position -= m_worldUp * vel;         break;
+        case ROTATE_LEFT:
+        case ROTATE_RIGHT:
+            // FreeCamera não usa esses enums para girar por teclado; ignore.
+            break;
+    }
+}
 
-        void FreeCamera::setTarget(const glm::vec3 &target)
-        {
-            Engine::Core::Log::Warn("FreeCamera: setTarget called, but control is via position. Ignoring or adjusting.");
-        }
+void FreeCamera::processMouseMovement(double xpos, double ypos) {
+    if (m_firstMouse) {
+        m_lastMouseX = xpos;
+        m_lastMouseY = ypos;
+        m_firstMouse = false;
+        return; // debounce do primeiro delta
+    }
 
-        void FreeCamera::setZoom(float zoom_value)
-        {
-            zoom = glm::clamp(zoom_value, 1.0f, 90.0f);
-            Engine::Core::Log::Debug(std::format("FreeCamera: Zoom (FOV) definido para {}.", zoom));
-        }
+    float dx = static_cast<float>(xpos - m_lastMouseX);
+    float dy = static_cast<float>(m_lastMouseY - ypos); // invertido
 
-        void FreeCamera::setYaw(float yaw_degrees)
-        {
-            yaw = yaw_degrees;
-            updateVectors();
-            Engine::Core::Log::Trace(std::format("FreeCamera: Yaw definido para {}.", yaw_degrees));
-        }
+    m_lastMouseX = xpos;
+    m_lastMouseY = ypos;
 
-        // **** NOVOS: Implementação de getForwardVector e getRightVector ****
-        glm::vec3 FreeCamera::getForwardVector() const
-        {
-            return glm::normalize(glm::vec3(front.x, 0.0f, front.z));
-        }
+    m_yawDeg   += dx * m_mouseSens;   // graus por pixel
+    m_pitchDeg += dy * m_mouseSens;
 
-        glm::vec3 FreeCamera::getRightVector() const
-        {
-            return glm::normalize(glm::cross(getForwardVector(), glm::vec3(0.0f, 1.0f, 0.0f)));
-        }
+    m_pitchDeg = glm::clamp(m_pitchDeg, -89.0f, 89.0f);
 
-        void FreeCamera::setProjectionMatrix(float fov_degrees, float aspectRatio, float nearPlane, float farPlane)
-        {
-            m_projectionMatrix = glm::perspective(glm::radians(fov_degrees), aspectRatio, nearPlane, farPlane);
-        }
+    updateVectors();
+}
 
-        const glm::mat4 &FreeCamera::getProjectionMatrix() const
-        {
-            return m_projectionMatrix;
-        }
+void FreeCamera::processScroll(double yOffset) {
+    // Aproxima/afasta ajustando FOV (zoom ótico)
+    m_fovDeg = glm::clamp(m_fovDeg - static_cast<float>(yOffset), 1.0f, 90.0f);
+    rebuildProjection();
+}
 
-        glm::mat4 FreeCamera::getViewProjectionMatrix() const
-        {
-            // Combina a matriz de projeção (Perspectiva) com a matriz de visão (LookAt)
-            return m_projectionMatrix * getViewMatrix();
-        }
+// ---------------------------------
+// Limites / Config externa
+// ---------------------------------
+void FreeCamera::setDistanceLimits(float, float) {
+    // Não aplicável em free camera (sem pivô/órbita)
+}
 
-        // IMPLEMENTAÇÃO DE CONTRATO (NO-OPs para FreeCamera)
-        void FreeCamera::setDistanceLimits(float minDistance, float maxDistance) {
-            // FreeCamera não tem limites de distância.
-            Engine::Core::Log::Warn("[FreeCamera] Tentativa de aplicar setDistanceLimits; não aplicável.");
-        }
+void FreeCamera::setPitchLimits(float, float) {
+    // Sem limites custom — já clampamos em [-89, 89]
+}
 
-        void FreeCamera::setPitchLimits(float minPitchDegrees, float maxPitchDegrees) {
-            // FreeCamera não tem limites de pitch.
-            Engine::Core::Log::Warn("[FreeCamera] Tentativa de aplicar setPitchLimits; não aplicável.");
-        }
+void FreeCamera::applyExternalConfig(const Engine::Core::ConfigManager&) {
+    // No-op elegante; pode-se ler velocidade, sensibilidade, FOV, etc. no futuro.
+}
 
-        void FreeCamera::applyExternalConfig(const Engine::Core::ConfigManager &config) {
-            // Este método satisfaz o contrato. Pode ser estendido para ler velocidade, etc.
-            // Para o escopo do erro, basta garantir que ele existe.
-            Engine::Core::Log::Info("[FreeCamera] Configuração externa aplicada (limites ignorados).");
-            
-            // Exemplo de como você poderia ler a velocidade futura (se necessário):
-            // float speed = config.getValue<float>("camera.free.speed", 10.0f);
-            // m_movementSpeed = speed; 
-        }
+// ---------------------------------
+// Helpers
+// ---------------------------------
+void FreeCamera::updateVectors() {
+    // Constrói front a partir de yaw/pitch (graus) com a mesma convenção em todo o engine
+    const float yawRad   = deg2rad(m_yawDeg);
+    const float pitchRad = deg2rad(m_pitchDeg);
 
-    } // namespace Camera
+    glm::vec3 front;
+    front.x = std::cos(pitchRad) * std::cos(yawRad);
+    front.y = std::sin(pitchRad);
+    front.z = std::cos(pitchRad) * std::sin(yawRad);
+    m_front = glm::normalize(front);
+
+    m_right = glm::normalize(glm::cross(m_front, m_worldUp));
+    m_up    = glm::normalize(glm::cross(m_right, m_front));
+}
+
+void FreeCamera::rebuildProjection() {
+    m_projection = glm::perspective(glm::radians(m_fovDeg), m_aspect, m_near, m_far);
+}
+
+} // namespace Camera
 } // namespace Engine

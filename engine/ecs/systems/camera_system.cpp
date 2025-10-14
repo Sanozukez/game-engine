@@ -3,14 +3,11 @@
 #include "camera_system.h"
 #include "../../core/config_manager.h"
 #include "../../core/log.h"
-#include "../../math/vec3.h"
 #include "../../camera/free_camera.h"
 #include "../../camera/orbit_camera.h"
-#include "../../input/input_manager.h" // Garante InputManager
-#include "../../ecs/world.h"           // Garante World
-
+#include "../../input/input_manager.h"
+#include "../../ecs/world.h"
 #include <GLFW/glfw3.h>
-#include <glm/gtx/string_cast.hpp> // Para o Log
 
 namespace Engine
 {
@@ -18,25 +15,15 @@ namespace Engine
     {
         namespace System
         {
-
-            // ------------------------------------------------------------------------
-            // CONSTRUTOR: Setup de Inicialização e JSON (LSP)
-            // ------------------------------------------------------------------------
             CameraSystem::CameraSystem(Engine::Camera::ICamera &camera)
                 : m_camera(camera),
                   m_inputManager(Engine::Input::InputManager::Get())
             {
-                Engine::Core::Log::Info("CameraSystem: Inicializado. Aplicando setup JSON.");
+                auto &config = Engine::Core::ConfigManager::Get();
 
-                auto &config = Engine::Core::ConfigManager::
-Get();
-
-                // --- LÓGICA DE SETUP MIGRADA DO SCENE::INITIALIZE ---
                 if (auto *orbitCam = dynamic_cast<Engine::Camera::OrbitCamera *>(&m_camera))
                 {
-                    glm::vec3 initialTarget(0.0f, 1.0f, 0.0f);
-                    orbitCam->setTarget(initialTarget);
-
+                    orbitCam->setTarget(glm::vec3(0.0f, 1.0f, 0.0f));
                     orbitCam->setDistanceLimits(
                         config.getValue<float>("camera.orbit.min_distance", 2.0f),
                         config.getValue<float>("camera.orbit.max_distance", 25.0f));
@@ -48,65 +35,35 @@ Get();
                 {
                     freeCam->setPosition(glm::vec3(25.0f, 15.0f, 25.0f));
                 }
-
-                // NENHUM CALLBACK DEVE FICAR AQUI! (Eles estão no App::run)
             }
-
-            // ------------------------------------------------------------------------
-            // UPDATE: Lógica Contínua (WASD, Rotação A/D)
-            // ------------------------------------------------------------------------
 
             void CameraSystem::update(World &world, float dt)
             {
-                // DEFINIÇÃO DA VELOCIDADE ANGULAR (Suficiente, a velocidade linear é para o PlayerSystem)
-                float rotationAmountDegrees = 75.0f * dt;
+                const float rotationAmountDegrees = 75.0f * dt;
 
-                // 2. LÓGICA DE ROTAÇÃO E STRAFE
+                // RMB pressionado => modo "controle livre": A/D e Q/E = STRAFE lateral
                 if (m_inputManager.IsRightMouseButtonPressed())
                 {
-                    // ESTADO 1: MOUSE ROTAÇÃO (APENAS STRAFE LATERAL)
-                    // O MouseMoved callback está cuidando da rotação Pitch/Yaw. Aqui, tratamos APENAS o movimento lateral.
-
-                    // Side-Strafe (Movimento Lateral) - Usa A/D ou Q/E como strafe
                     if (m_inputManager.IsKeyPressed(GLFW_KEY_A) || m_inputManager.IsKeyPressed(GLFW_KEY_Q))
                         m_camera.processKeyboard(Camera::CameraMovement::LEFT, dt);
 
                     if (m_inputManager.IsKeyPressed(GLFW_KEY_D) || m_inputManager.IsKeyPressed(GLFW_KEY_E))
                         m_camera.processKeyboard(Camera::CameraMovement::RIGHT, dt);
-                }
-                else // Botão Direito Solto (ESTADO 2: CONTROLE DE TECLADO PURO)
-                {
-                    // // CORREÇÃO: RESTAURAÇÃO DO GIRO A/D (Ação principal da ICamera)
-                    // if (m_inputManager.IsKeyPressed(GLFW_KEY_A))
-                    //     m_camera.setYaw(m_camera.getYaw() + rotationAmountDegrees);
 
-                    // if (m_inputManager.IsKeyPressed(GLFW_KEY_D))
-                    //     m_camera.setYaw(m_camera.getYaw() - rotationAmountDegrees);
-
-                    // Side-Strafe (Q/E) - Tratamento secundário
-                    if (m_inputManager.IsKeyPressed(GLFW_KEY_Q))
-                        m_camera.processKeyboard(Camera::CameraMovement::LEFT, dt);
-
-                    if (m_inputManager.IsKeyPressed(GLFW_KEY_E))
-                        m_camera.processKeyboard(Camera::CameraMovement::RIGHT, dt);
+                    return; // não aplicar yaw nesses frames
                 }
 
-                const EntityID playerID = world.getSingleEntityWith<Component::Player>();
+                // RMB solto => A/D giram a câmera (o Player acompanha se estiver acoplado)
+                if (m_inputManager.IsKeyPressed(GLFW_KEY_A))
+                    m_camera.setYaw(m_camera.getYaw() + rotationAmountDegrees);
+                if (m_inputManager.IsKeyPressed(GLFW_KEY_D))
+                    m_camera.setYaw(m_camera.getYaw() - rotationAmountDegrees);
 
-                // if (playerID != INVALID_ENTITY_ID)
-                // {
-                //     // A câmera deve ler a posição FINAL do Player (que já foi atualizada)
-                //     Component::Transform &transform = world.getTransform(playerID);
-                //     Component::Movement &movementComponent = world.getComponent<Component::Movement>(playerID);
-
-                //     glm::vec3 playerPosGLM = transform.position.toGLM();
-
-                //     // Calcula o ponto de foco (posição do Player + offset de altura)
-                //     glm::vec3 cameraFocusPoint = playerPosGLM + glm::vec3(0.0f, movementComponent.cameraFocusHeight, 0.0f);
-
-                //     // ATUALIZA O ALVO DA CÂMERA
-                //     m_camera.setTarget(cameraFocusPoint);
-                // }
+                // (opcional) Q/E strafe também sem RMB
+                if (m_inputManager.IsKeyPressed(GLFW_KEY_Q))
+                    m_camera.processKeyboard(Camera::CameraMovement::LEFT, dt);
+                if (m_inputManager.IsKeyPressed(GLFW_KEY_E))
+                    m_camera.processKeyboard(Camera::CameraMovement::RIGHT, dt);
             }
 
         } // namespace System

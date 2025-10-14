@@ -10,6 +10,9 @@ target_sources(engine
     PUBLIC # Headers que definem a interface pública deste módulo
         ${CMAKE_CURRENT_SOURCE_DIR}/input_manager.h
         ${CMAKE_CURRENT_SOURCE_DIR}/input_service.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/i_keyboard_listener.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/i_mouse_listener.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/i_scroll_listener.h
 )
 
 # Adiciona o diretório 'input' como um diretório de inclusão pública para o target 'engine'.

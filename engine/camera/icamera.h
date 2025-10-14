@@ -3,70 +3,75 @@
 
 #include <glm/glm.hpp>
 
-// --- FORWARD DECLARATION CRÍTICA ---
-namespace Engine
-{
-    namespace Core
-    {
-        class ConfigManager;
-    }
+// --- Forward declaration para evitar dependência pesada de headers ---
+namespace Engine {
+namespace Core {
+    class ConfigManager;
+}
 }
 
-namespace Engine
-{
-    namespace Camera
-    {
-        // Enum CameraMovement permanece o mesmo
-        enum CameraMovement
-        {
-            FORWARD,
-            BACKWARD,
-            LEFT,
-            RIGHT,
-            UP,
-            DOWN,
-            ROTATE_LEFT,
-            ROTATE_RIGHT
-        };
+namespace Engine {
+namespace Camera {
 
-        class ICamera
-        {
-        public:
-            virtual ~ICamera() = default;
+    // Mantém os mesmos movimentos básicos
+    enum CameraMovement {
+        FORWARD,
+        BACKWARD,
+        LEFT,
+        RIGHT,
+        UP,
+        DOWN,
+        ROTATE_LEFT,
+        ROTATE_RIGHT
+    };
 
-            // Métodos existentes
-            virtual glm::mat4 getViewMatrix() const = 0;
-            virtual float getZoom() const = 0;
-            virtual const glm::vec3 &getPosition() const = 0;
-            virtual glm::vec3 getForwardVector() const = 0;
-            virtual glm::vec3 getRightVector() const = 0;
-            virtual float getYaw() const = 0;
-            virtual glm::vec3 getTarget() const = 0;
-            virtual void processKeyboard(CameraMovement direction, float deltaTime) = 0;
-            virtual void processMouseMovement(double xpos, double ypos) = 0;
-            virtual void processScroll(double yOffset) = 0;
+    // Interface de câmera minimalista e consistente.
+    // Responsabilidades:
+    // - View/Projection
+    // - Posição/orientação (yaw/pitch)
+    // - Movimento por teclado/mouse/scroll
+    // - Alvos/limites/config externa
+    class ICamera {
+    public:
+        virtual ~ICamera() = default;
 
-            virtual void setPosition(const glm::vec3 &position) = 0;
-            virtual void setTarget(const glm::vec3 &target) = 0;
-            virtual void resetMouseState() = 0;
-            virtual void setZoom(float zoom_value) = 0;
-            virtual void setYaw(float yaw_degrees) = 0;
+        // --- Matrizes ---
+        virtual glm::mat4 getViewMatrix() const = 0;
+        virtual glm::mat4 getProjectionMatrix() const = 0;
+        virtual glm::mat4 getViewProjectionMatrix() const = 0;
 
-            // --- NOVOS MÉTODOS VIRTUAIS ---
-            // Define a matriz de projeção da câmera
-            virtual void setProjectionMatrix(float fov_degrees, float aspectRatio, float nearPlane, float farPlane) = 0;
-            // Retorna a matriz de projeção armazenada
-            virtual const glm::mat4 &getProjectionMatrix() const = 0;
+        // --- Consulta de estado ---
+        virtual float getZoom() const = 0;
+        virtual const glm::vec3& getPosition() const = 0;
+        virtual glm::vec3 getForwardVector() const = 0;
+        virtual glm::vec3 getRightVector() const = 0;
+        virtual float getYaw() const = 0;
+        virtual float getPitch() const = 0;
+        virtual glm::vec3 getTarget() const = 0;
 
-            virtual glm::mat4 getViewProjectionMatrix() const = 0;
+        // --- Mutação de estado ---
+        virtual void setPosition(const glm::vec3& position) = 0;
+        virtual void setTarget(const glm::vec3& target) = 0;
+        virtual void setZoom(float zoom_value) = 0;
+        virtual void setYaw(float yaw_degrees) = 0;
+        virtual void setPitch(float pitch_degrees) = 0;
 
-            // NOVO: Usa o nome correto (Engine::Core::ConfigManager)
-            virtual void setDistanceLimits(float minDistance, float maxDistance) = 0;
-            virtual void setPitchLimits(float minPitchDegrees, float maxPitchDegrees) = 0;
+        // --- Projeção ---
+        virtual void setProjectionMatrix(float fov_degrees,
+                                         float aspectRatio,
+                                         float nearPlane,
+                                         float farPlane) = 0;
 
-            // CRÍTICO: Assinatura correta para a interface
-            virtual void applyExternalConfig(const Engine::Core::ConfigManager &config) = 0;
-        };
+        // --- Input de usuário ---
+        virtual void processKeyboard(CameraMovement direction, float deltaTime) = 0;
+        virtual void processMouseMovement(double xpos, double ypos) = 0; // útil para modos não “travados no centro”
+        virtual void processScroll(double yOffset) = 0;
 
-    } // namespace Camera
+        // --- Limites / Config externa ---
+        virtual void setDistanceLimits(float minDistance, float maxDistance) = 0;
+        virtual void setPitchLimits(float minPitchDegrees, float maxPitchDegrees) = 0;
+        virtual void applyExternalConfig(const Engine::Core::ConfigManager& config) = 0;
+    };
+
+} // namespace Camera
 } // namespace Engine

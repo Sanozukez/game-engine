@@ -13,7 +13,7 @@
 #include "./../../engine/input/input_manager.h"
 
 // NOVO: Inclui a classe AppSetup, que contém toda a lógica de inicialização
-#include "app_setup.h" 
+#include "app_setup.h"
 
 #include <glm/gtx/string_cast.hpp>
 #include <thread>
@@ -23,7 +23,6 @@
 #include <format>
 #include <limits>
 #include <GLFW/glfw3.h> // Necessário para as funções GLFW no APP
-
 
 using namespace Engine::ECS;
 
@@ -38,7 +37,6 @@ App::App() : m_window(nullptr), m_renderer(nullptr), m_gameWorld(std::make_uniqu
 
 App::~App() = default;
 
-
 // ----------------------------------------------------------------------------------
 // FUNÇÃO PRINCIPAL: ORQUESTRAÇÃO DO FLUXO (CLEAN)
 // ----------------------------------------------------------------------------------
@@ -49,12 +47,17 @@ void App::run()
 
     // --- CARREGAMENTO DE CONFIGURAÇÃO BASE ---
     auto &config = Engine::Core::ConfigManager::
-Get();
+        Get();
     if (!config.load("config/engine_settings.json"))
     {
         Engine::Core::Log::Critical("[App] Falha ao carregar configurações essenciais. Encerrando.");
         return;
     }
+
+    // === LIGAR LOG DETALHADO ===
+    // Engine::Core::Log::SetLogLevel(Engine::Core::LogLevel::Trace);
+    // Engine::Core::Log::Info("[App] Logging set to TRACE");
+    
 
     // --- 1. INICIALIZAÇÃO DA JANELA ---
     // ESTA LÓGICA DEVE FICAR AQUI, POIS CRIA MEMBROS DE App (m_window)
@@ -66,14 +69,23 @@ Get();
     winConfig.resizable = config.getValue<bool>("window.resizable", false);
     winConfig.fullscreen = config.getValue<bool>("window.fullscreen", false);
     winConfig.maximized = false;
-    
-    try { m_window = std::make_unique<Engine::Window>(winConfig); }
-    catch (const std::exception &e) { Engine::Core::Log::Critical(std::format("[App] Erro fatal na inicialização da janela: {}", e.what())); return; }
+
+    try
+    {
+        m_window = std::make_unique<Engine::Window>(winConfig);
+    }
+    catch (const std::exception &e)
+    {
+        Engine::Core::Log::Critical(std::format("[App] Erro fatal na inicialização da janela: {}", e.what()));
+        return;
+    }
 
     GLFWwindow *glfwWindow = m_window->getGLFWWindow();
-    if (!glfwWindow) { return; }
+    if (!glfwWindow)
+    {
+        return;
+    }
     Engine::Input::InputManager::Get().ProcessInput(glfwWindow);
-
 
     // --- 2. INICIALIZAÇÃO DA CÂMERA E RENDERER ---
     // ESTA LÓGICA DEVE FICAR AQUI, POIS CRIA MEMBROS DE App (m_mainCamera, m_renderer)
@@ -89,27 +101,28 @@ Get();
         m_mainCamera = std::make_unique<Engine::Camera::OrbitCamera>();
     }
     Engine::Core::Log::Info(std::format("[App] Câmera inicializada a partir do JSON: {}", cameraType));
-    
+
     m_renderer = std::make_unique<Engine::Render::Renderer>(*m_window, *m_mainCamera.get());
 
     // --- 3. ORQUESTRAÇÃO DO SETUP (DELEGADO PARA AppSetup) ---
     Engine::Render::Renderer &rendererRef = *m_renderer;
     Engine::Camera::ICamera &cameraRef = *m_mainCamera.get();
-    
+
     // ** CHAMADA 1: CONFIGURAÇÃO DE CÂMERA/LUZ **
-    if (!Engine::Core::AppSetup::InitializeConfiguration(config, rendererRef, cameraRef, glfwWindow)) {
+    if (!Engine::Core::AppSetup::InitializeConfiguration(config, rendererRef, cameraRef, glfwWindow))
+    {
         Engine::Core::Log::Critical("[App] Falha na configura├º├úo de Luz/C├ómera. Encerrando.");
         return;
     }
-    
+
     // ** CHAMADA 2: CRIAÇÃO DE ENTIDADES, LOAD E ADIÇÃO DE SISTEMAS **
-    if (!Engine::Core::AppSetup::InitializeECS(*m_gameWorld.get(), cameraRef, rendererRef, glfwWindow)) {
+    if (!Engine::Core::AppSetup::InitializeECS(*m_gameWorld.get(), cameraRef, rendererRef, glfwWindow))
+    {
         Engine::Core::Log::Critical("[App] Falha ao inicializar o ECS/World. Encerrando.");
         return;
     }
-    
-    Engine::Core::Log::Info("[App] Setup completo. Iniciando Game Loop.");
 
+    Engine::Core::Log::Info("[App] Setup completo. Iniciando Game Loop.");
 
     // === LOOP DE RENDERIZAÇÃO ===
     float lastFrame = 0.0f;

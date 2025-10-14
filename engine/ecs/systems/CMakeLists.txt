@@ -10,4 +10,5 @@ target_sources(engine
     terrain_tracking_system.cpp
     camera_system.cpp
     camera_target_system.cpp
+    camera_input_system.cpp
 )

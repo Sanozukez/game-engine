@@ -30,6 +30,9 @@ struct Movement {
     
     // NOVO: Taxa de Aceleração/Desaceleração
     float accelerationRate = 15.0f; // Ex: 15 metros/s² (Ajuste conforme o game feel)
+
+    // FIX: novo estado para acoplamento da câmera
+    bool isCameraAttachedToPlayer = false;
     
     // NOTA DE ARQUITETURA:
     // O TransformComponent (position, rotation) já lida com a posição.

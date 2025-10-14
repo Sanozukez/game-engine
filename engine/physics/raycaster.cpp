@@ -3,6 +3,8 @@
 #include "raycaster.h"
 #include "./../../engine/camera/icamera.h"
 #include <glm/gtc/matrix_inverse.hpp>
+#include "../../camera/camera_math.h"
+#include <glm/gtx/norm.hpp>
 
 namespace Engine
 {
@@ -10,12 +12,12 @@ namespace Engine
     {
 
         // Implementação da função de interseção de raios(para uso no ajuste de altura)
-                std::optional<float> rayTriangleIntersect(
-                    const glm::vec3 &rayOrigin,
-                    const glm::vec3 &rayDirection,
-                    const glm::vec3 &v0,
-                    const glm::vec3 &v1,
-                    const glm::vec3 &v2)
+        std::optional<float> rayTriangleIntersect(
+            const glm::vec3 &rayOrigin,
+            const glm::vec3 &rayDirection,
+            const glm::vec3 &v0,
+            const glm::vec3 &v1,
+            const glm::vec3 &v2)
         {
             // CÓDIGO DE INTERSEÇÃO DE RAIO/TRIÂNGULO
             // Este é um algoritmo complexo (Möller–Trumbore) que estava em seu código original.
@@ -79,7 +81,12 @@ namespace Engine
             // 4. Coordenadas do Mundo (World Space)
             glm::vec3 rayWorld = glm::vec3(glm::inverse(viewMatrix) * rayEye);
 
-            m_rayDirection = glm::normalize(rayWorld);
+            m_rayDirection = Engine::Camera::Math::safeNormalize(rayWorld);
+            if (glm::length2(m_rayDirection) < 1e-12f)
+            {
+                // fallback estável: use o forward atual da câmera
+                m_rayDirection = Engine::Camera::Math::safeNormalize(camera.getForwardVector());
+            }
             m_rayOrigin = camera.getPosition();
         }
 

@@ -13,36 +13,32 @@ namespace Engine
         namespace System
         {
 
-             void CameraTargetSystem::update(World &world, float dt)
+            void CameraTargetSystem::update(World &world, float dt)
             {
                 // NOVO: Iteração sobre o pool m_entities
-                if (m_entities.empty()) {
+                if (m_entities.empty())
+                {
                     return; // Não há alvo, não faz nada.
                 }
-                
+
                 // Assumimos que o primeiro (e único) elemento é o alvo da câmera (o Player)
                 const EntityID entityID = *m_entities.begin();
-                
+
                 // Obtém os Componentes necessários (garantidos pela Signature)
                 Component::Transform &transform = world.getComponent<Component::Transform>(entityID);
                 const Component::CameraTarget &target = world.getComponent<Component::CameraTarget>(entityID);
-                
+
                 glm::vec3 playerPosGLM = transform.position.toGLM();
                 glm::vec3 cameraFocusPoint = playerPosGLM + glm::vec3(0.0f, target.focusHeight, 0.0f);
 
                 // --- CORREÇÃO DE FRAME 0 (CRÍTICO para a inicialização) ---
                 if (m_camera.getTarget() == glm::vec3(0.0f) && glm::length(playerPosGLM) > 1.0f)
                 {
-                    // Lógica de inicialização (yaw, target, reset mouse state)
-                    glm::quat playerQuat = transform.rotation;
-                    float playerYawDegrees = glm::degrees(glm::yaw(playerQuat));
-
-                    m_camera.setYaw(playerYawDegrees);
+                    // A única função é forçar o Target no frame 0.
                     m_camera.setTarget(cameraFocusPoint);
-                    m_camera.resetMouseState();
                 }
 
-                // APLICA O TRACKING NORMAL
+                // APLICA O TRACKING NORMAL (Única função deste sistema)
                 m_camera.setTarget(cameraFocusPoint);
             }
 

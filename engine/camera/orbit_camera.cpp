@@ -1,12 +1,14 @@
-// // engine/camera/orbit_camera.cpp (VERSÃO FINAL E FUNCIONAL)
+// engine/camera/orbit_camera.cpp
 #include "orbit_camera.h"
-#include "../core/config_manager.h" // CRÍTICO: Necessário para a definição completa de ConfigManager
+#include "../core/config_manager.h"
 #include "../core/log.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/constants.hpp>
-#include <algorithm>
 #include <glm/gtx/string_cast.hpp>
-
+#include <algorithm>
+#include <format>
+#include "camera_math.h" // util de ângulos e checagens
+#include <glm/gtx/norm.hpp>
 
 namespace Engine
 {
@@ -14,58 +16,171 @@ namespace Engine
     {
 
         OrbitCamera::OrbitCamera()
-            : target_(0.0f, 0.0f, 0.0f),
-              distance_(5.0f),
-              pitch_(-0.5f), yaw_(0.7f),
-              m_zoom(45.0f),
-              m_projectionMatrix(1.0f), // Inicializa a matriz de projeção como identidade
-              m_lastMouseX(0.0), m_lastMouseY(0.0), m_firstMouse(true)
         {
-            Engine::Core::Log::Info("OrbitCamera: Construtor chamado.");
+            Core::Log::Info("OrbitCamera: ctor");
         }
 
-        void Engine::Camera::OrbitCamera::applyExternalConfig(const Engine::Core::ConfigManager &config)
+        void OrbitCamera::applyExternalConfig(const Core::ConfigManager &config)
         {
-            // Leitura dos limites da câmera (Lógica migrada do AppSetup!)
-            float minDist = config.getValue<float>("camera.orbit.min_distance", 3.0f);
-            float maxDist = config.getValue<float>("camera.orbit.max_distance", 13.0f);
-            float minPitch = config.getValue<float>("camera.orbit.min_pitch_degrees", -55.0f);
-            float maxPitch = config.getValue<float>("camera.orbit.max_pitch_degrees", 15.0f);
+            const float minDist = config.getValue<float>("camera.orbit.min_distance", 3.0f);
+            const float maxDist = config.getValue<float>("camera.orbit.max_distance", 13.0f);
+            const float minPitch = config.getValue<float>("camera.orbit.min_pitch_degrees", -55.0f);
+            const float maxPitch = config.getValue<float>("camera.orbit.max_pitch_degrees", 15.0f);
 
-            // Chama os métodos concretos da própria classe
-            setDistanceLimits(minDist, maxDist); 
-            setPitchLimits(minPitch, maxPitch); 
+            setDistanceLimits(minDist, maxDist);
+            setPitchLimits(minPitch, maxPitch);
 
-            Engine::Core::Log::Info(std::format("[OrbitCamera] Limites configurados por configuração externa."));
+            Core::Log::Info("[OrbitCamera] Limits applied from config");
+        }
+
+        glm::mat4 OrbitCamera::getViewMatrix() const
+        {
+            rebuildCachedPosition();
+
+            // direção para o alvo
+            glm::vec3 dir = glm::normalize(m_target - m_cachedPos);
+
+            // up base
+            glm::vec3 up(0.0f, 1.0f, 0.0f);
+
+            // evita colinearidade: se cross quase zero, ajusta levemente o up
+            glm::vec3 right = glm::cross(dir, up);
+            if (glm::length2(right) < 1e-10f)
+            {
+                up = glm::normalize(glm::cross(glm::vec3(1.0f, 0.0f, 0.0f), dir));
+                if (glm::length2(up) < 1e-10f)
+                {
+                    up = glm::vec3(0.0f, 1.0f, 0.0f);
+                }
+            }
+            else
+            {
+                up = glm::normalize(glm::cross(right, dir));
+            }
+
+            return glm::lookAt(m_cachedPos, m_target, up);
+        }
+
+        glm::mat4 OrbitCamera::getProjectionMatrix() const
+        {
+            return m_projection; // por valor, consistente com a interface
+        }
+
+        glm::mat4 OrbitCamera::getViewProjectionMatrix() const
+        {
+            return getProjectionMatrix() * getViewMatrix();
+        }
+
+        float OrbitCamera::getZoom() const
+        {
+            return m_fovDeg;
+        }
+
+        const glm::vec3 &OrbitCamera::getPosition() const
+        {
+            rebuildCachedPosition();
+            return m_cachedPos;
+        }
+
+        glm::vec3 OrbitCamera::getForwardVector() const
+        {
+            // direções no plano XZ (niveladas), úteis para strafe do target
+            return glm::normalize(glm::vec3(std::sin(m_yawRad), 0.0f, std::cos(m_yawRad)));
+        }
+
+        glm::vec3 OrbitCamera::getRightVector() const
+        {
+            return glm::normalize(glm::cross(getForwardVector(), glm::vec3(0, 1, 0)));
+        }
+
+        float OrbitCamera::getYaw() const
+        {
+            return glm::degrees(m_yawRad);
+        }
+
+        float OrbitCamera::getPitch() const
+        {
+            return glm::degrees(m_pitchRad);
+        }
+
+        glm::vec3 OrbitCamera::getTarget() const
+        {
+            return m_target;
+        }
+
+        void OrbitCamera::setPosition(const glm::vec3 &position)
+        {
+            // Na orbit, “position” significa orbitar o alvo → interpretamos como novo alvo.
+            m_target = position;
         }
 
         void OrbitCamera::setTarget(const glm::vec3 &target)
         {
-            target_ = target;
-
-            // CORREÇÃO FINAL PARA O FRAME 0:
-            // setRotation usa pitch_ e yaw_ e os aplica ao Target.
-            // REMOVA: resetMouseState();
-            // setRotation(pitch_, yaw_); // <--- Chamamos setRotation para forçar o recálculo.
-
-            // A chamada a setRotation já deve ser o suficiente.
-
-            Engine::Core::Log::Debug(std::format("OrbitCamera: Target definido para {}", glm::to_string(target_)));
+            m_target = target;
+            // Core::Log::Debug(std::format("OrbitCamera: target={}", glm::to_string(target)));
         }
 
-        // REMOVIDO: O método InitializePosition deve ser removido
-
-        void OrbitCamera::setDistance(float distance)
+        void OrbitCamera::setZoom(float zoom_value)
         {
-            distance_ = glm::clamp(distance, m_minDistance, m_maxDistance);
-            Engine::Core::Log::Debug(std::format("OrbitCamera: Distância definida para {}", distance_));
+            m_fovDeg = std::clamp(zoom_value, 1.0f, 90.0f);
+            Core::Log::Debug(std::format("OrbitCamera: FOV={} deg", m_fovDeg));
         }
 
-        void OrbitCamera::setRotation(float pitch, float yaw)
+        void OrbitCamera::setYaw(float yaw_degrees)
         {
-            pitch_ = pitch;
-            yaw_ = yaw;
-            Engine::Core::Log::Debug(std::format("OrbitCamera: Rotação definida (pitch: {}, yaw: {}).", pitch_, yaw_));
+            m_yawRad = glm::radians(yaw_degrees);
+            // wrap para manter estável
+            if (m_yawRad > glm::pi<float>())
+                m_yawRad -= glm::two_pi<float>();
+            if (m_yawRad < -glm::pi<float>())
+                m_yawRad += glm::two_pi<float>();
+        }
+
+        void OrbitCamera::setPitch(float pitch_degrees)
+        {
+            m_pitchRad = glm::radians(pitch_degrees);
+            clampPitch();
+        }
+
+        void OrbitCamera::setProjectionMatrix(float fov_degrees,
+                                              float aspectRatio,
+                                              float nearPlane,
+                                              float farPlane)
+        {
+            m_fovDeg = fov_degrees;
+            m_projection = glm::perspective(glm::radians(fov_degrees), aspectRatio, nearPlane, farPlane);
+        }
+
+        void OrbitCamera::processKeyboard(CameraMovement direction, float dt)
+        {
+            const float speed = 3.5f * dt;
+
+            glm::vec3 fwd = getForwardVector();
+            glm::vec3 right = getRightVector();
+
+            // mantém nivelado
+            fwd.y = 0.0f;
+            right.y = 0.0f;
+            fwd = glm::normalize(fwd);
+            right = glm::normalize(right);
+
+            switch (direction)
+            {
+            case LEFT:
+                m_target -= right * speed;
+                break;
+            case RIGHT:
+                m_target += right * speed;
+                break;
+            case FORWARD:
+                m_target += fwd * speed;
+                break;
+            case BACKWARD:
+                m_target -= fwd * speed;
+                break;
+            default:
+                break; // UP/DOWN/rotates não aplicam no alvo aqui
+            }
         }
 
         void OrbitCamera::processMouseMovement(double xpos, double ypos)
@@ -75,138 +190,86 @@ namespace Engine
                 m_lastMouseX = xpos;
                 m_lastMouseY = ypos;
                 m_firstMouse = false;
-                return;
+                return; // ignora primeiro delta
             }
 
             float deltaX = static_cast<float>(xpos - m_lastMouseX);
             float deltaY = static_cast<float>(m_lastMouseY - ypos);
-
             m_lastMouseX = xpos;
             m_lastMouseY = ypos;
 
+            // --- anti-spike: satura deltas por frame ---
+            const float maxDelta = 100.0f; // pixels/frame
+            deltaX = glm::clamp(deltaX, -maxDelta, +maxDelta);
+            deltaY = glm::clamp(deltaY, -maxDelta, +maxDelta);
+
             const float sensitivity = 0.003f;
 
-            yaw_ -= deltaX * sensitivity;
-            pitch_ += deltaY * sensitivity;
+            // sentido “natural”: mover mouse p/ direita → yaw positivo (ou troque o sinal se preferir)
+            m_yawRad -= deltaX * sensitivity;
+            m_pitchRad += deltaY * sensitivity;
 
-            pitch_ = glm::clamp(pitch_, m_minPitch, m_maxPitch);
+            // clamp de pitch nos limites já em radianos
+            clampPitch();
 
-            Engine::Core::Log::Trace(std::format("OrbitCamera: Mouse moved (deltaX: {}, deltaY: {}). Pitch: {}, Yaw: {}.", deltaX, deltaY, pitch_, yaw_));
+            // wrap de yaw para [-pi, pi] (evita crescimento indefinido)
+            if (m_yawRad > glm::pi<float>())
+                m_yawRad -= glm::two_pi<float>();
+            if (m_yawRad < -glm::pi<float>())
+                m_yawRad += glm::two_pi<float>();
         }
 
         void OrbitCamera::processScroll(double yOffset)
         {
-            setDistance(distance_ - static_cast<float>(yOffset));
-            Engine::Core::Log::Debug(std::format("OrbitCamera: Processed scroll. New distance: {}.", distance_));
+            setDistance(m_distance - static_cast<float>(yOffset));
+            Core::Log::Debug(std::format("OrbitCamera: distance={}", m_distance));
         }
 
-        void OrbitCamera::processKeyboard(CameraMovement direction, float deltaTime)
+        void OrbitCamera::setDistanceLimits(float minD, float maxD)
         {
-            // Intencionalmente vazio
+            m_minDistance = minD;
+            m_maxDistance = maxD;
+            setDistance(m_distance); // re-clamp atual
         }
 
-        glm::mat4 OrbitCamera::getViewMatrix() const
+        void OrbitCamera::setPitchLimits(float minPitchDeg, float maxPitchDeg)
         {
-            float x = distance_ * cosf(pitch_) * sinf(yaw_);
-            float y = distance_ * sinf(pitch_);
-            float z = distance_ * cosf(pitch_) * cosf(yaw_);
-
-            glm::vec3 cameraPos = target_ - glm::vec3(x, y, z);
-
-            if (cameraPos.y < 0.05f)
-            {
-                cameraPos.y = 0.05f;
-            }
-
-            return glm::lookAt(cameraPos, target_, glm::vec3(0, 1, 0));
+            m_minPitchRad = glm::radians(minPitchDeg);
+            m_maxPitchRad = glm::radians(maxPitchDeg);
+            clampPitch();
         }
 
-        float OrbitCamera::getZoom() const
+        void OrbitCamera::setDistance(float distance)
         {
-            return m_zoom;
+            m_distance = std::clamp(distance, m_minDistance, m_maxDistance);
+            if (m_distance < 0.05f)
+                m_distance = 0.05f; // piso duro para evitar lookAt degenerado
         }
 
-        const glm::vec3 &OrbitCamera::getPosition() const
+        void OrbitCamera::setRotation(float pitchRad, float yawRad)
         {
-            static glm::vec3 calculatedPos;
-            float x = distance_ * cosf(pitch_) * sinf(yaw_);
-            float y = distance_ * sinf(pitch_);
-            float z = distance_ * cosf(pitch_) * cosf(yaw_);
-            calculatedPos = target_ - glm::vec3(x, y, z);
-            return calculatedPos;
+            m_pitchRad = pitchRad;
+            m_yawRad = yawRad;
+            clampPitch();
         }
 
-        // NOVO: getTarget() implementado
-        glm::vec3 OrbitCamera::getTarget() const
+        // --- helpers ---
+        void OrbitCamera::clampPitch()
         {
-            return target_;
+            m_pitchRad = std::clamp(m_pitchRad, m_minPitchRad, m_maxPitchRad);
         }
 
-        float OrbitCamera::getYaw() const
+        void OrbitCamera::rebuildCachedPosition() const
         {
-            return glm::degrees(yaw_);
-        }
+            const float x = m_distance * std::cos(m_pitchRad) * std::sin(m_yawRad);
+            const float y = m_distance * std::sin(m_pitchRad);
+            const float z = m_distance * std::cos(m_pitchRad) * std::cos(m_yawRad);
 
-        glm::vec3 OrbitCamera::getForwardVector() const
-        {
-            return glm::normalize(glm::vec3(sin(yaw_), 0.0f, cos(yaw_)));
-        }
+            m_cachedPos = m_target - glm::vec3(x, y, z);
 
-        glm::vec3 OrbitCamera::getRightVector() const
-        {
-            return glm::normalize(glm::cross(getForwardVector(), glm::vec3(0.0f, 1.0f, 0.0f)));
-        }
-
-        void OrbitCamera::setPosition(const glm::vec3 &position)
-        {
-            target_ = position;
-        }
-
-        void OrbitCamera::resetMouseState()
-        {
-            m_firstMouse = true;
-            Engine::Core::Log::Debug("OrbitCamera: Mouse state reset (m_firstMouse = true).");
-        }
-
-        void OrbitCamera::setZoom(float zoom_value)
-        {
-            m_zoom = glm::clamp(zoom_value, 1.0f, 90.0f);
-            Engine::Core::Log::Debug(std::format("OrbitCamera: Zoom (FOV) definido para {}.", m_zoom));
-        }
-
-        void OrbitCamera::setYaw(float yaw_degrees)
-        {
-            yaw_ = glm::radians(yaw_degrees);
-            Engine::Core::Log::Trace(std::format("OrbitCamera: Yaw definido para {} graus.", yaw_degrees));
-        }
-
-        void OrbitCamera::setProjectionMatrix(float fov, float aspectRatio, float nearPlane, float farPlane)
-        {
-            m_projectionMatrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane);
-        }
-
-        const glm::mat4 &OrbitCamera::getProjectionMatrix() const
-        {
-            return m_projectionMatrix;
-        }
-
-        void OrbitCamera::setDistanceLimits(float min, float max)
-        {
-            m_minDistance = min;
-            m_maxDistance = max;
-            setDistance(distance_);
-        }
-
-        void OrbitCamera::setPitchLimits(float minDegrees, float maxDegrees)
-        {
-            m_minPitch = glm::radians(minDegrees);
-            m_maxPitch = glm::radians(maxDegrees);
-            pitch_ = glm::clamp(pitch_, m_minPitch, m_maxPitch);
-        }
-
-        glm::mat4 OrbitCamera::getViewProjectionMatrix() const
-        {
-            return getProjectionMatrix() * getViewMatrix();
+            // evita lookAt degenerar
+            if (m_cachedPos.y < 0.05f)
+                m_cachedPos.y = 0.05f;
         }
 
     } // namespace Camera

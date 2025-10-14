@@ -1,6 +1,7 @@
 // engine/render/renderer.cpp
 #include "./shader.h"
 #include "renderer.h"
+#include "safety_guards.h"
 #include "../math/transform_utils.h"
 #include "./../window/window.h"
 #include "./../core/log.h"
@@ -108,6 +109,43 @@ namespace Engine
                 glm::mat4 projection = m_camera.getProjectionMatrix();
                 glm::mat4 view = m_camera.getViewMatrix();
 
+                // --- Guards anti-NaN/Inf com cache local (evita teleporte) ---
+                static glm::mat4 s_lastGoodProj = glm::mat4(1.0f);
+                static glm::mat4 s_lastGoodView = glm::mat4(1.0f);
+
+                // Projection: tenta corrigir e, se necessário, usa a última válida
+                if (!Engine::Render::Safety::finiteMat4(projection))
+                {
+                    m_camera.setProjectionMatrix(
+                        glm::clamp(m_camera.getZoom(), 20.0f, 100.0f),
+                        std::max(0.0001f, m_window.getAspectRatio()),
+                        0.1f, 500.0f);
+                    projection = m_camera.getProjectionMatrix();
+                    if (!Engine::Render::Safety::finiteMat4(projection))
+                    {
+                        projection = Engine::Render::Safety::finiteMat4(s_lastGoodProj) ? s_lastGoodProj : glm::mat4(1.0f);
+                    }
+                }
+
+                // View: reconstrói com lookAt seguro e, se necessário, usa a última válida
+                if (!Engine::Render::Safety::finiteMat4(view))
+                {
+                    const glm::vec3 eye = m_camera.getPosition();
+                    const glm::vec3 center = eye + m_camera.getForwardVector();
+                    const glm::vec3 up = glm::vec3(0, 1, 0);
+                    view = Engine::Render::Safety::safeLookAt(eye, center, up);
+                    if (!Engine::Render::Safety::finiteMat4(view))
+                    {
+                        view = Engine::Render::Safety::finiteMat4(s_lastGoodView) ? s_lastGoodView : glm::mat4(1.0f);
+                    }
+                }
+
+                // Atualiza o cache se este frame está válido
+                if (Engine::Render::Safety::finiteMat4(projection))
+                    s_lastGoodProj = projection;
+                if (Engine::Render::Safety::finiteMat4(view))
+                    s_lastGoodView = view;
+
                 // --- CORREÇÃO FINAL: Usar a matriz de transformação completa (T, R e S) ---
                 // A modelMatrix é declarada e inicializada UMA ÚNICA VEZ aqui.
                 glm::mat4 modelMatrix = Engine::Math::getTransformMatrix(transform);
@@ -141,13 +179,13 @@ namespace Engine
             // Comando para a câmera recalcular e armazenar sua matriz de projeção
             m_camera.setProjectionMatrix(fov, aspectRatio, 0.1f, 500.0f);
 
-            Engine::Core::Log::Trace(std::format("Renderer: Matriz de projeção da câmera atualizada. FOV: {}, Aspect: {}.", fov, aspectRatio));
+            // Engine::Core::Log::Trace(std::format("Renderer: Matriz de projeção da câmera atualizada. FOV: {}, Aspect: {}.", fov, aspectRatio));
         }
 
         void Renderer::configureViewport()
         {
             glViewport(0, 0, m_window.getWidth(), m_window.getHeight());
-            Engine::Core::Log::Trace(std::format("Renderer: Viewport configurado para {}x{}.", m_window.getWidth(), m_window.getHeight()));
+            // Engine::Core::Log::Trace(std::format("Renderer: Viewport configurado para {}x{}.", m_window.getWidth(), m_window.getHeight()));
         }
 
         void Renderer::clearScreen()
