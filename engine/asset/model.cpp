@@ -1,13 +1,15 @@
 // engine/asset/model.cpp
 #include "model.h"
 #include "./../core/log.h"
-
-#include "./../../engine/render/shader.h" // Incluir Shader para Mesh::draw
-
+#include "./../render/shader.h" // Incluir Shader para Mesh::draw
 #include "../render/opengl_types.h"
+#include "./../ecs/components/animation_component.h"
+#include "../ecs/components/component_signature.h"
 #include <cstddef> // For offsetof
 #include <format>
 #include <vector>
+
+using namespace Engine::ECS::Component;
 
 namespace Engine
 {
@@ -104,7 +106,10 @@ namespace Engine
                 m_material->deactivate();
             }
         }
-        // --- Model Class ---
+
+        // -------------------------------------------------------------
+        // Model Class
+        // -------------------------------------------------------------
         Model::Model() = default;
         Model::~Model() = default;
 
@@ -121,8 +126,86 @@ namespace Engine
             }
         }
 
-        void Engine::Asset::Model::draw(Engine::Render::Shader &shader)
+        // -------------------------------------------------------------
+        // MÉTODOS DE SKELETON
+        // -------------------------------------------------------------
+
+        void Model::addBone(const std::string &name, const glm::mat4 &offset)
         {
+            // O Model armazena os dados, o GLTFLoader é quem preenche.
+            // Garante que o osso não seja adicionado duas vezes.
+            if (m_boneInfoMap.find(name) == m_boneInfoMap.end())
+            {
+                BoneInfo info;
+                info.id = m_boneCounter;
+                info.offset = offset;
+                m_boneInfoMap[name] = info;
+                m_boneCounter++;
+            }
+        }
+
+        void Model::addNode(const Node &node)
+        {
+            m_nodeHierarchy[node.name] = node;
+        }
+
+        // NOVO : Shell de getBoneIndexByName
+        int Model::getBoneIndexByName(const std::string &boneName) const
+        {
+            auto it = m_boneInfoMap.find(boneName);
+            if (it != m_boneInfoMap.end())
+            {
+                return it->second.id;
+            }
+            return -1;
+        }
+
+        // NOVO: Shell de getNodeChildren
+        const std::vector<std::string> Model::getNodeChildren(const std::string &nodeName) const
+        {
+            if (m_nodeHierarchy.count(nodeName))
+            {
+                return m_nodeHierarchy.at(nodeName).childrenNames;
+            }
+            return {};
+        }
+
+        // NOVO: Shell de getNodeLocalTransform
+        const glm::mat4 Model::getNodeLocalTransform(const std::string &nodeName) const
+        {
+            if (m_nodeHierarchy.count(nodeName))
+            {
+                return m_nodeHierarchy.at(nodeName).localTransform;
+            }
+            // Retorna Identity como fallback seguro (como o shell)
+            return glm::mat4(1.0f);
+        }
+
+        // A implementação de getSkeletonRootName() e getBoneInfoMap() são inline (no .h),
+        // então elas não precisam ser definidas aqui.
+
+        const AnimationClip* Model::getAnimationClip(uint32_t nameHash) const
+        {
+            if (m_animationClips.count(nameHash))
+            {
+                return &m_animationClips.at(nameHash);
+            }
+            return nullptr;
+        }
+
+        void Model::draw(Engine::Render::Shader &shader, const std::vector<glm::mat4> *boneTransforms)
+        {
+            // NOVO: Se boneTransforms estiver presente, enviar para o shader.
+            if (boneTransforms != nullptr)
+            {
+                // Certifique-se de que o MAX_BONES está visível. Usamos a constante do Componente.
+                for (size_t i = 0; i < boneTransforms->size() && i < Animation::MAX_BONES; ++i)
+                {
+                    std::string uniformName = "uBoneTransforms[" + std::to_string(i) + "]";
+                    shader.setMat4(uniformName, boneTransforms->at(i));
+                }
+                // Nota: A flag uIsAnimated já foi setada no Renderer::submit.
+            }
             // A implementação correta é:
             for (const auto &mesh_ptr : m_meshes)
             {

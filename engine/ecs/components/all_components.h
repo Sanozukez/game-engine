@@ -9,6 +9,7 @@
 #include "player_component.h"
 #include "movement_component.h"
 #include "terrain_component.h"
+#include "animation_component.h"
 
 // Componentes de Rastreamento e Câmera
 #include "terrain_tracker_component.h"

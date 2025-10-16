@@ -63,6 +63,12 @@ void Shader::unuse() const {
     glUseProgram(0);
 }
 
+// Implementação de setBool
+void Shader::setBool(const std::string &name, bool value) const
+{
+    glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value); 
+}
+
 GLuint Shader::getID() const
 {
     return ID;
@@ -96,7 +102,7 @@ GLuint Shader::compileShader(GLenum type, const std::string &source)
 GLint Shader::getUniformLocation(const std::string& name) const {
     GLint location = glGetUniformLocation(ID, name.c_str());
     if (location == -1) {
-        Engine::Core::Log::Warn(std::format("[Shader] Uniform '{}' not found (ID: {}).", name, ID));
+       // Engine::Core::Log::Warn(std::format("[Shader] Uniform '{}' not found (ID: {}).", name, ID));
     }
     return location;
 }

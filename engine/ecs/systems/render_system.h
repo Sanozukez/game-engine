@@ -5,6 +5,7 @@
 #include "base_system.h"
 #include "../components/transform_component.h"
 #include "../../render/renderer.h" // Mantemos o include para o compilador do RenderSystem.cpp
+#include "../components/animation_component.h"
 
 namespace Engine
 {

@@ -38,8 +38,12 @@ namespace Engine
 
             void endScene();
 
-            //  Recebe os DADOS puros do ECS e desenha o objeto.
-            void submit(uint32_t assetID, const ECS::Component::Transform &transform);
+            // MODIFICADO: A nova interface OBRIGA que o chamador passe os dados de animação (nullptr é o default)
+            // O método antigo `void submit(uint32_t assetID, const ECS::Component::Transform &transform)`
+            // é substituído ou modificado por este:
+            void submit(uint32_t assetID,
+                        const ECS::Component::Transform &transform,
+                        const std::vector<glm::mat4> *boneTransforms = nullptr);
 
             //  Retorna o Shader Ativo
             Engine::Render::Shader &getActiveShader();
@@ -54,8 +58,8 @@ namespace Engine
             void updateProjectionMatrix();
 
             // NOVOS SETTERS DE LUZ (CORREÇÃO DE ERROS C2039)
-            void setGlobalLightPos(const glm::vec3& pos);
-            void setGlobalLightColor(const glm::vec3& color);
+            void setGlobalLightPos(const glm::vec3 &pos);
+            void setGlobalLightColor(const glm::vec3 &color);
             void setGlobalLightIntensity(float intensity);
 
         private:

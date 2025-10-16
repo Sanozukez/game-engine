@@ -6,8 +6,12 @@
     "fullscreen": false,
     "resizable": false
   },
+  "input": {
+    "mouse_sensitivity": 0.1
+  },
   "camera": {
     "default_type": "orbit",
+    "follow_smooth_factor": 0.15,
     "orbit": {
       "min_distance": 3.0,
       "max_distance": 13.0,
@@ -17,13 +21,25 @@
   },
   "character": {
     "player": {
+      "model_name": "character_placeholder.glb",
       "movement_speed": 5.5,
       "rotation_speed_degrees": 80.0,
-      "camera_focus_height": 1.2
+      "camera_focus_height": 1.2,
+      "start_position": [
+        0.0,
+        50.0,
+        0.0
+      ]
     }
   },
   "world": {
     "start_map_path": "assets/models/test_scene_1.mmap",
+    "terrain_raycast_height": 200.0,
+    "gravity": [
+      0.0,
+      -9.8,
+      0.0
+    ],
     "global_light": {
       "position": [
         50.0,
@@ -36,6 +52,12 @@
         1.0
       ],
       "intensity": 30.0
+    }
+  },
+  "rendering": {
+    "default_shader": {
+      "vertex_path": "engine/shaders/animated.vert",
+      "fragment_path": "engine/shaders/basic.frag"
     }
   }
 }

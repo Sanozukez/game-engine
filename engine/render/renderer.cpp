@@ -95,7 +95,9 @@ namespace Engine
         // IMPLEMENTAÇÃO ECS: submit (Recebe DADOS puros)
         // **********************************************
 
-        void Renderer::submit(uint32_t assetID, const ECS::Component::Transform &transform)
+        void Renderer::submit(uint32_t assetID,
+                              const ECS::Component::Transform &transform,
+                              const std::vector<glm::mat4> *boneTransforms /* = nullptr */)
         {
             std::shared_ptr<Engine::Asset::Model> model = Engine::Asset::AssetManager::Get().getModel(assetID);
 
@@ -155,6 +157,11 @@ namespace Engine
                 shader.setMat4("uView", view);
                 shader.setMat4("uModel", modelMatrix); // <-- AGORA COM ROTAÇÃO E ESCALA
 
+                // 4. ENVIAR DADOS DE ANIMAÇÃO
+                // O Shader precisa saber se deve usar as matrizes de bone.
+                const bool isAnimated = (boneTransforms != nullptr);
+                shader.setBool("uIsAnimated", isAnimated);
+
                 // NOVO: Setar as propriedades globais da Fonte de Luz (MIGRADO DO HARDCODE)
                 // Assumimos que o Shader tem as uniforms uLightColor e uLightIntensity.
                 shader.setVec3("uLightPos", m_globalLightPos);
@@ -164,8 +171,8 @@ namespace Engine
                 // 4. Setar posição da câmera (para iluminação)
                 shader.setVec3("uViewPos", m_camera.getPosition());
 
-                // 5. Chamar a função de desenho
-                model->draw(shader);
+                // 5. Chamar a função de desenho (Model::draw deve ser atualizado para receber os bones)
+                model->draw(shader, boneTransforms);
 
                 shader.unuse();
             }

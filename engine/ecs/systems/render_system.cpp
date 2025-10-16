@@ -24,17 +24,31 @@ namespace Engine
                 // 1. Inicia o frame (chamada de baixo nível)
                 m_renderer.beginScene();
 
-                // 2. NOVO: Itera sobre a lista de entidades (m_entities) fornecida pelo World.
-                // Esta lista JÁ CONTÉM SOMENTE entidades com Transform e Mesh. (DIP)
+                // 2. Itera sobre a lista de entidades (m_entities) com Transform e Mesh
                 for (const EntityID entityID : m_entities)
                 {
                     // 3. Obtém os componentes necessários
-                    // O World GARANTE que esses componentes existem, então usamos getComponent
                     Component::Transform &transform = world.getComponent<Component::Transform>(entityID);
                     Component::Mesh &mesh = world.getComponent<Component::Mesh>(entityID);
 
+                    // --- NOVO: VERIFICAÇÃO DE ANIMAÇÃO (Lógica opcional) ---
+                    // O vetor de bones é opcional (nullptr para objetos estáticos)
+                    const std::vector<glm::mat4> *boneTransforms = nullptr;
+
+                    // Verifica se a Entidade tem um Componente de Animação (OPTIONAL)
+                    if (world.hasComponent<Component::Animation>(entityID))
+                    {
+                        // O World garante que a Entidade tem o componente.
+                        auto &anim = world.getComponent<Component::Animation>(entityID);
+
+                        // Aponta para as transformações calculadas pelo AnimationSystem
+                        boneTransforms = &anim.finalBoneTransforms;
+                    }
+                    // -----------------------------------------------------
+
                     // 4. Envia os dados para o Renderer
-                    m_renderer.submit(mesh.assetID, transform);
+                    // O Renderer trata se boneTransforms é nullptr (objeto estático) ou não.
+                    m_renderer.submit(mesh.assetID, transform, boneTransforms);
                 }
 
                 // 5. Finaliza o frame

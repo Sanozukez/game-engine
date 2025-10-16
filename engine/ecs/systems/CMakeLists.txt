@@ -7,6 +7,7 @@ target_sources(engine
     PRIVATE
     render_system.cpp
     player_system.cpp
+    animation_system.cpp
     terrain_tracking_system.cpp
     camera_system.cpp
     camera_target_system.cpp

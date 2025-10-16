@@ -24,6 +24,9 @@ public:
     void setFloat(const std::string& name, float value) const; 
     void setVec4(const std::string& name, const glm::vec4& value) const;
 
+    // Método para enviar booleanos ao Shader
+    void setBool(const std::string &name, bool value) const;
+
 private:
     GLuint ID;
     std::string loadShaderSource(const std::string& path);

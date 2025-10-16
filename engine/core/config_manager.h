@@ -4,6 +4,7 @@
 
 #include <string>
 #include <nlohmann/json.hpp>
+#include "../math/vec3_json.h"
 #include <regex> // Adicionado para uso dentro do header
 #include "log.h" // Adicionado para uso dentro do header
 

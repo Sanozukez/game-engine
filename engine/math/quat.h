@@ -14,6 +14,12 @@ namespace Engine
 
         struct Quat : public glm::quat
         {
+            // Retorna a matriz de rotação 4x4
+            glm::mat4 toMat4() const;
+
+            // MÉTODOS ESTÁTICOS (fmod, Slerp)
+            // Interpolação Esférica (SLERP)
+            static Quat slerp(const Quat &q1, const Quat &q2, float t);
 
             // Construtor Default
             Quat() : glm::quat(1.0f, 0.0f, 0.0f, 0.0f) {}

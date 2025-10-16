@@ -57,7 +57,7 @@ namespace Engine
             std::string getAssetPathByID(uint32_t assetID);
 
             // 3. Helper de Dev (usado pelo WorldInitializer)
-            uint32_t getAssetIDByName(const std::string &assetName);
+            static uint32_t getAssetIDByName(const std::string &assetName);
 
             // (Futuro: Adicionar getTexture e getAudio)
         };

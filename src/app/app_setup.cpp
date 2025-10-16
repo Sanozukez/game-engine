@@ -3,6 +3,7 @@
 #include "app_setup.h"
 #include "./../../core/log.h"
 #include "./../../ecs/systems/player_system.h"
+#include "./../../ecs/systems/animation_system.h"
 #include "./../../ecs/systems/terrain_tracking_system.h"
 #include "./../../ecs/systems/render_system.h"
 #include "./../../ecs/world_loader.h" // Incluir o WorldLoader diretamente
@@ -10,8 +11,9 @@
 #include "./../../ecs/components/all_components.h" // Incluir todos os componentes
 #include "./../../ecs/components/component_signature.h"
 #include "./../../camera/orbit_camera.h" // <--- INCLUSÃO CRÍTICA (OrbitCamera)
-#include "../../ecs/components/camera_input_component.h"
-
+#include "./../../ecs/components/camera_input_component.h"
+#include "./../../engine/core/config_manager.h" // Importar para acessar o JSON
+#include "./../../engine/asset/asset_manager.h"
 
 #include "./../../input/i_keyboard_listener.h"
 #include "./../../input/i_mouse_listener.h"
@@ -99,17 +101,69 @@ namespace Engine
             world.registerComponent<TerrainTracker>();
             world.registerComponent<CameraTarget>();
             world.registerComponent<CameraInput>();
+            world.registerComponent<Animation>();
             Log::Info("[AppSetup] Todos os Componentes ECS registrados com sucesso.");
 
+            // [AppSetup] Lendo configurações do JSON
+            auto &config = ConfigManager::Get();
+            auto &assetManager = Engine::Asset::AssetManager::Get(); // Acesso ao AssetManager
+
+            // --------------------------------------------------------------------------------
+            // 1. OBTENDO CONFIGURAÇÕES DO JSON (Usando as variáveis já declaradas no topo)
+            // --------------------------------------------------------------------------------
+            // config e assetManager foram lidos no topo, usaremos as variáveis
+            // que estão no escopo (linhas 106-114 do seu código)
+
+            std::string playerModelName = config.getValue<std::string>("character.player.model_name", "character_placeholder.glb");
+            glm::vec3 startPos = config.getValue<glm::vec3>("character.player.start_position", glm::vec3(0.0f, 50.0f, 0.0f));
+            const uint32_t playerAssetID = assetManager.getAssetIDByName(playerModelName);
+
+            if (playerAssetID == 0)
+            {
+                Log::Critical(std::format("[Setup] Falha ao resolver Asset ID para: {}. Player não será criado.", playerModelName));
+                return false;
+            }
+
+            // --------------------------------------------------------------------------------
+            // 2. CRIAÇÃO E CONSTRUÇÃO EXPLÍCITA DOS COMPONENTES (RESOLUÇÃO DO C2672)
+            // --------------------------------------------------------------------------------
             Engine::ECS::EntityID playerEntity = world.createEntity();
-            const uint32_t PLAYER_ASSET_ID = 614879287;
+
+            // Transform Componente
             world.addComponent<Transform>(playerEntity);
-            world.addComponent<Mesh>(playerEntity, PLAYER_ASSET_ID);
-            world.getComponent<Transform>(playerEntity).position = Engine::Math::Vec3(0.0f, -100.0f, 0.0f);
-            world.addComponent<Player>(playerEntity);
-            world.addComponent<Movement>(playerEntity);
-            world.addComponent<TerrainTracker>(playerEntity);
-            world.addComponent<CameraInput>(playerEntity);
+            world.getComponent<Transform>(playerEntity).position = Engine::Math::Vec3(startPos);
+
+            // Mesh Componente (CORRIGIDO: Construção explícita)
+            Component::Mesh playerMeshConfig{playerAssetID};
+            world.addComponent<Mesh>(playerEntity, playerMeshConfig);
+
+            // Player Componente (vazio, Construção explícita)
+            Component::Player playerConfig{};
+            world.addComponent<Player>(playerEntity, playerConfig);
+
+            // Inicializa o asset de animação com o mesmo assetID da Mesh.
+            Component::Animation playerAnimConfig;
+            playerAnimConfig.animationAssetID = playerAssetID;
+            // Define o ID da animação inicial (ex: "IDLE"). Precisaremos do hash em runtime.
+            // Por enquanto, usaremos um ID de fallback ou o hash de "IDLE" (hash("IDLE")).
+            // Vamos definir uma função de hash temporária ou usar o AssetManager se ele for adequado.
+            // Assumindo que você tem uma forma de fazer hash ou que o asset manager tem essa função:
+            playerAnimConfig.currentAnimationID = 0; // Temporário, será o hash de "IDLE"
+            world.addComponent<Animation>(playerEntity, playerAnimConfig);
+
+            // Movement Componente (Configurado pelo JSON)
+            Component::Movement playerMovementConfig;
+            playerMovementConfig.movementSpeed = config.getValue<float>("character.player.movement_speed", 5.5f);
+            playerMovementConfig.rotationSpeed = config.getValue<float>("character.player.rotation_speed_degrees", 80.0f);
+            playerMovementConfig.cameraFocusHeight = config.getValue<float>("character.player.camera_focus_height", 1.2f);
+            world.addComponent<Movement>(playerEntity, playerMovementConfig);
+
+            // Componentes vazios (CORRIGIDO: Construção explícita)
+            Component::TerrainTracker terrainTrackerConfig{};
+            world.addComponent<TerrainTracker>(playerEntity, terrainTrackerConfig);
+
+            Component::CameraInput cameraInputConfig{};
+            world.addComponent<CameraInput>(playerEntity, cameraInputConfig);
 
             if (!Engine::ECS::WorldLoader::Load(world, playerEntity))
             {
@@ -129,7 +183,6 @@ namespace Engine
             // CRÍTICO: World::addSystem constrói o objeto no heap e o gerencia.
             // world.addSystem<Engine::ECS::System::CameraInputSystem>(cameraRef, inputManagerRef, inputService);
             world.addSystem<Engine::ECS::System::CameraInputSystem>(world, cameraRef, inputManagerRef, inputService);
-
 
             Engine::ECS::System::CameraInputSystem *camInputSystemPtr =
                 world.getSystem<Engine::ECS::System::CameraInputSystem>();
@@ -165,11 +218,17 @@ namespace Engine
             world.addSystem<PlayerSystem>(cameraRef);
             world.registerSystemSignature<PlayerSystem>(playerSignature);
 
+            // 2. -- TERRAIN TRACKING SYSTEM --
+
+            // 1. Ler a altura do raycast do JSON
+            float terrainRaycastHeight = config.getValue<float>("world.terrain_raycast_height", 150.0f);
+
             // -- TERRAIN TRACKING SYSTEM --
             ComponentSignature terrainTrackingSignature;
             terrainTrackingSignature.set(typeManager.getTypeID<Transform>());
             terrainTrackingSignature.set(typeManager.getTypeID<TerrainTracker>());
-            world.addSystem<TerrainTrackingSystem>();
+            // Injeta a altura do raycast no System
+            world.addSystem<TerrainTrackingSystem>(terrainRaycastHeight);
             world.registerSystemSignature<TerrainTrackingSystem>(terrainTrackingSignature);
 
             // --- 3. EXECUÇÃO DE FRAME 0 E SETUP DA CÂMERA (SYNC CRÍTICO) ---
@@ -180,6 +239,16 @@ namespace Engine
             {
                 terrainSystem->update(world, 0.0f);
             }
+
+            // --- ANIMATION SYSTEM ---
+            ComponentSignature animationSignature;
+            animationSignature.set(typeManager.getTypeID<Transform>());
+            animationSignature.set(typeManager.getTypeID<Movement>());
+            animationSignature.set(typeManager.getTypeID<Animation>());
+
+            // Injetamos o AssetManager para que o sistema possa acessar os dados GLTF/Animation
+            world.addSystem<AnimationSystem>(assetManager);
+            world.registerSystemSignature<AnimationSystem>(animationSignature);
 
             // 2. APLICAÇÃO DE YAW E TARGET (Configuração da Câmera)
             Component::Transform &currentTransform = world.getComponent<Component::Transform>(playerEntity);
