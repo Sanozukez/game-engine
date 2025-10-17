@@ -17,6 +17,17 @@ static glm::mat4 getGltfNodeTransform(const cgltf_node *node)
     {
         matrix = glm::make_mat4(node->matrix);
     }
+    else // <--- NOVO: Leitura de T, R, S
+    {
+        glm::vec3 T = node->has_translation ? glm::make_vec3(node->translation) : glm::vec3(0.0f);
+        glm::quat R = node->has_rotation ? glm::make_quat(node->rotation) : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        glm::vec3 S = node->has_scale ? glm::make_vec3(node->scale) : glm::vec3(1.0f);
+
+        // Constrói a matriz: Translação * Rotação * Escala
+        matrix = glm::translate(glm::mat4(1.0f), T);
+        matrix *= glm::mat4_cast(R);
+        matrix = glm::scale(matrix, S);
+    }
     return matrix;
 }
 

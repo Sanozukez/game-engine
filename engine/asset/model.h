@@ -31,7 +31,8 @@ namespace Engine
             glm::vec3 Normal;
             glm::vec2 TexCoords;
             glm::vec3 Tangent;
-            // glm::vec3 Bitangent;
+            glm::ivec4 BoneIDs = glm::ivec4(0);     
+            glm::vec4 Weights = glm::vec4(0.0f);
         };
 
         struct BoneInfo

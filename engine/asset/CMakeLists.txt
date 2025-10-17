@@ -10,6 +10,7 @@ target_sources(engine
         ${CMAKE_CURRENT_SOURCE_DIR}/asset_manager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/animation_utils.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/animation_loader.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/gltf_data_reader.cpp
     PUBLIC # Public headers of the Asset module
         ${CMAKE_CURRENT_SOURCE_DIR}/model.h
         ${CMAKE_CURRENT_SOURCE_DIR}/obj_loader.h
@@ -17,6 +18,7 @@ target_sources(engine
         ${CMAKE_CURRENT_SOURCE_DIR}/asset_manager.h
         ${CMAKE_CURRENT_SOURCE_DIR}/animation_utils.h
         ${CMAKE_CURRENT_SOURCE_DIR}/animation_loader.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/gltf_data_reader.h
 )
 
 # Adiciona o diretório 'asset' como um diretório de inclusão pública para o target 'engine'.

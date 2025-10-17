@@ -80,6 +80,12 @@ namespace Engine
             // Tangent (layout = 3)
             glEnableVertexAttribArray(3);
             glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Tangent));
+            // aBoneIDs (location = 3) - Tipo Inteiro
+            glEnableVertexAttribArray(3);
+            glVertexAttribIPointer(3, 4, GL_INT, sizeof(Vertex), (void *)offsetof(Vertex, BoneIDs));
+            // aWeights (location = 4) - Tipo Float
+            glEnableVertexAttribArray(4);
+            glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Weights));
 
             glBindVertexArray(0); // Unbind VAO
             Engine::Core::Log::Trace(std::format("Mesh: VAO ({}), VBO ({}), EBO ({}) configured.", m_VAO, m_VBO, m_EBO));
@@ -184,7 +190,7 @@ namespace Engine
         // A implementação de getSkeletonRootName() e getBoneInfoMap() são inline (no .h),
         // então elas não precisam ser definidas aqui.
 
-        const AnimationClip* Model::getAnimationClip(uint32_t nameHash) const
+        const AnimationClip *Model::getAnimationClip(uint32_t nameHash) const
         {
             if (m_animationClips.count(nameHash))
             {
