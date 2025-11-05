@@ -29,12 +29,14 @@ namespace Engine::Asset
 
         // Utilitário que você já usou no PlayerSystem
         static uint32_t getAnimationHashID(const std::string& name);
+        
+        // NOVO: Função de utilidade para implementar a regra de negócio do Root Bone.
+        // Será usada no Asset Loader e será case-insensitive.
+        static bool IsRootBoneName(const std::string& bone_name);
 
     private:
-        // Funções internas para lógica de animação (futuro)
-        static glm::mat4 calculateLocalTransform(
-            const AnimationData& anim, float time, uint32_t boneIndex);
-        
-        // ... (etc.)
+        // A função calculateLocalTransform não é usada e será removida para limpar o código.
+        // static glm::mat4 calculateLocalTransform(
+        //     const AnimationData& anim, float time, uint32_t boneIndex);
     };
 }

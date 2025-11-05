@@ -73,7 +73,7 @@ namespace Engine
                 Engine::Core::Log::Warn("AssetManager: Usando dicionario de assets de fallback (hardcoded).");
 
                 // Coloque aqui os IDs mínimos essenciais para que o jogo não quebre em DEV.
-                m_assetIDToPathMap[614879287] = "char.glb";
+                m_assetIDToPathMap[614879287] = "character_test.glb";
                 m_assetIDToPathMap[3665308213] = "wall_module_placeholder.glb";
                 m_assetIDToPathMap[3574192723] = "test_scene_1.glb";
                 m_assetIDToPathMap[0] = "fallback_asset.glb";

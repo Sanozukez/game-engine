@@ -192,3 +192,18 @@ cd build/src/Debug
 ./game-engine.exe
 
 #define GLFW_INCLUDE_NONE
+
+
+"character": {
+    "player": {
+      "model_name": "character_placeholder.glb",
+      "movement_speed": 5.5,
+      "rotation_speed_degrees": 80.0,
+      "camera_focus_height": 1.2,
+      "start_position": [
+        0.0,
+        50.0,
+        0.0
+      ]
+    }
+  },

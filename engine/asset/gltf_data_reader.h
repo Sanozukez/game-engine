@@ -18,10 +18,12 @@ class GltfDataReader
 {
 public:
     // Função principal que carrega os dados de uma primitiva e a adiciona ao Model.
-    static void loadPrimitive(
-        const cgltf_primitive *gltfPrimitive,
-        Engine::Asset::Model &model,
-        const std::string &baseDirectory);
+    static std::unique_ptr<Mesh> loadPrimitive(
+        const cgltf_primitive* gltfPrimitive,
+        Engine::Asset::Model& model,
+        const std::string& baseDirectory,
+        const glm::mat4& nodeTransform  // NEW
+    );
         
     // Função auxiliar para carregar texturas embedadas ou externas
     static std::unique_ptr<Render::Texture> loadGltfTexture(

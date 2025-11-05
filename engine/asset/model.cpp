@@ -15,16 +15,39 @@ namespace Engine
 {
     namespace Asset
     {
-
         // --- Mesh Class ---
-        Mesh::Mesh(std::vector<Vertex> &&vertices, std::vector<uint32_t> &&indices, std::unique_ptr<Render::Material> material)
-            : m_vertices(std::move(vertices)),
-              m_indices(std::move(indices)),
-              m_material(std::move(material))
-        {
-            setupMesh();
-            Engine::Core::Log::Info(std::format("Mesh: Created with {} vertices and {} indices.", m_vertices.size(), m_indices.size()));
-        }
+        Mesh::Mesh(std::vector<Vertex>&& vertices,
+           std::vector<uint32_t>&& indices,
+           std::unique_ptr<Render::Material> material,
+           const glm::mat4& nodeTransform)
+: m_vertices(std::move(vertices))
+, m_indices(std::move(indices))
+, m_material(std::move(material))
+, m_nodeTransform(nodeTransform)
+{
+    setupMesh();
+}
+
+// Construtor “antigo” (compat) → node = Identity
+Mesh::Mesh(std::vector<Vertex>&& vertices,
+           std::vector<uint32_t>&& indices,
+           std::unique_ptr<Render::Material> material)
+: m_vertices(std::move(vertices))
+, m_indices(std::move(indices))
+, m_material(std::move(material))
+, m_nodeTransform(1.0f)
+{
+    setupMesh();
+}
+
+Mesh::Mesh(const Mesh& other)
+: m_vertices(other.m_vertices)
+, m_indices(other.m_indices)
+, m_material(other.m_material ? other.m_material->clone() : nullptr)
+, m_nodeTransform(other.m_nodeTransform)
+{
+    setupMesh();
+}
 
         Mesh::~Mesh()
         {
@@ -37,17 +60,7 @@ namespace Engine
             Engine::Core::Log::Trace("Mesh: Destructor called. OpenGL resources released.");
         }
 
-        // NOVO: Construtor de Cópia (Necessário para Model::clone())
-        Mesh::Mesh(const Mesh &other)
-            : m_vertices(other.m_vertices),
-              m_indices(other.m_indices),
-              // Chama o clone do material (que clona as texturas)
-              m_material(other.m_material ? other.m_material->clone() : nullptr)
-        {
-            // O construtor de cópia exige que os novos buffers OpenGL sejam criados.
-            setupMesh();
-            Engine::Core::Log::Trace(std::format("Mesh: Copied (Deep Copy) and new OpenGL buffers created."));
-        }
+       
 
         void Mesh::setupMesh()
         {
@@ -77,22 +90,24 @@ namespace Engine
             // Texture Coordinates (layout = 2)
             glEnableVertexAttribArray(2);
             glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, TexCoords));
-            // Tangent (layout = 3)
+            // Tangent (location = 3)
             glEnableVertexAttribArray(3);
             glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Tangent));
-            // aBoneIDs (location = 3) - Tipo Inteiro
-            glEnableVertexAttribArray(3);
-            glVertexAttribIPointer(3, 4, GL_INT, sizeof(Vertex), (void *)offsetof(Vertex, BoneIDs));
-            // aWeights (location = 4) - Tipo Float
-            glEnableVertexAttribArray(4);
-            glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Weights));
 
-            glBindVertexArray(0); // Unbind VAO
-            Engine::Core::Log::Trace(std::format("Mesh: VAO ({}), VBO ({}), EBO ({}) configured.", m_VAO, m_VBO, m_EBO));
+            // BoneIDs (location = 4)  **inteiro**
+            glEnableVertexAttribArray(4);
+            glVertexAttribIPointer(4, 4, GL_INT, sizeof(Vertex), (void *)offsetof(Vertex, BoneIDs));
+
+            // Weights (location = 5)
+            glEnableVertexAttribArray(5);
+            glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Weights));
+
+            glBindVertexArray(0);
         }
 
         void Engine::Asset::Mesh::draw(Engine::Render::Shader &shader)
         {
+            shader.setMat4("uNode", m_nodeTransform);
             // 1. Ativar o Shader (passado como argumento)
             // O Material::activate precisa do Shader para configurar uniforms.
             if (m_material)
@@ -147,6 +162,21 @@ namespace Engine
                 info.offset = offset;
                 m_boneInfoMap[name] = info;
                 m_boneCounter++;
+            }
+        }
+
+        void Model::addBone(const std::string &name, const glm::mat4 &offset, int forcedId)
+        {
+            // Nova versão: força o ID igual ao índice do joint do GLTF
+            if (m_boneInfoMap.find(name) == m_boneInfoMap.end())
+            {
+                BoneInfo info;
+                info.id = forcedId;
+                info.offset = offset;
+                m_boneInfoMap[name] = info;
+
+                // Garante que o contador nunca fique menor que o maior ID já adicionado
+                m_boneCounter = std::max(m_boneCounter, forcedId + 1);
             }
         }
 
@@ -243,6 +273,52 @@ namespace Engine
 
             Engine::Core::Log::Trace(std::format("Model: Clonado com sucesso! {} meshes copiadas.", clonedModel->m_meshes.size()));
             return clonedModel;
+        }
+
+        // Implementação do Setter para a Transformação Global do Nó
+        void Model::setNodeGlobalTransform(const std::string &nodeName, const glm::mat4 &transform)
+        {
+            // Armazena no membro privado m_nodeGlobalTransforms
+            m_nodeGlobalTransforms[nodeName] = transform;
+        }
+
+        // NOVO: Implementação da função que extrai a geometria das linhas do esqueleto.
+        // A posição de cada bone é a translação final (matriz[3]).
+        std::vector<glm::vec3> Model::getSkeletonDebugLines(const std::vector<glm::mat4> &finalBoneTransforms) const
+        {
+            std::vector<glm::vec3> lines;
+
+            // ATENÇÃO: Itera sobre a HIERARQUIA, não sobre o m_nodeGlobalTransforms diretamente.
+            for (const auto &pair : m_nodeHierarchy)
+            {
+                const Node &node = pair.second;
+
+                // 1. Tenta obter a matriz Global do nó (matriz de posição animada)
+                if (m_nodeGlobalTransforms.count(node.name))
+                { // Verifica se este nó tem uma Global Transform animada
+
+                    glm::mat4 currentBoneGlobal = m_nodeGlobalTransforms.at(node.name);
+                    glm::vec3 currentPos = glm::vec3(currentBoneGlobal[3]);
+
+                    // 2. Itera sobre os filhos
+                    for (const auto &childName : node.childrenNames)
+                    {
+
+                        // Pega a posição do filho APENAS se ele também tem uma matriz Global armazenada.
+                        if (m_nodeGlobalTransforms.count(childName))
+                        {
+
+                            glm::mat4 childBoneGlobal = m_nodeGlobalTransforms.at(childName);
+                            glm::vec3 childPos = glm::vec3(childBoneGlobal[3]);
+
+                            // Adiciona as coordenadas (Ponto A e Ponto B)
+                            lines.push_back(currentPos); // Ponto A (Pai)
+                            lines.push_back(childPos);   // Ponto B (Filho)
+                        }
+                    }
+                }
+            }
+            return lines;
         }
 
     } // namespace Asset

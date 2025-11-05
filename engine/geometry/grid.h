@@ -1,8 +1,6 @@
 // engine/geometry/grid.h
 #pragma once
 
-#include <glad/gl.h>
-
 namespace Engine { // NOVO: Namespace Engine
 namespace Geometry { // NOVO: Namespace Geometry
 

@@ -17,18 +17,17 @@ using namespace Engine::Asset;
 
 // Definimos o hash usando o AnimationUtils (que usa std::hash)
 // Isso é necessário porque o AnimationSystem::update não é static.
-const uint32_t ANIM_IDLE = AnimationUtils::getAnimationHashID("IDLE"); // CORRIGIDO
-const uint32_t ANIM_RUN = AnimationUtils::getAnimationHashID("RUN");   // CORRIGIDO
+const uint32_t ANIM_IDLE = AnimationUtils::getAnimationHashID("idle"); // CORRIGIDO
+const uint32_t ANIM_RUN = AnimationUtils::getAnimationHashID("run");   // CORRIGIDO
 
-
-AnimationSystem::AnimationSystem(AssetManager& assetManager) 
+AnimationSystem::AnimationSystem(AssetManager &assetManager)
     : m_assetManager(assetManager)
 {
     // O construtor é simples, apenas armazena a dependência.
 }
 
 // Implementação simples da função utilitária (para uso futuro)
-uint32_t AnimationSystem::getAnimationID(const std::string& animationName) const
+uint32_t AnimationSystem::getAnimationID(const std::string &animationName) const
 {
     // Esta função deve usar o AssetManager::getAssetIDByName(animationName)
     // para garantir o hash consistente do sistema, usando a instância injetada.
@@ -38,28 +37,37 @@ uint32_t AnimationSystem::getAnimationID(const std::string& animationName) const
 void AnimationSystem::update(World &world, float dt)
 {
     // Itera sobre todas as Entidades com a assinatura: Transform, Movement, Animation
-    for (const auto& entity : m_entities)
+    for (const auto &entity : m_entities)
     {
-        // auto& tr = world.getComponent<Transform>(entity); // Transform é necessário para o cálculo final
-        auto& mv = world.getComponent<Movement>(entity);
-        auto& anim = world.getComponent<Animation>(entity);
-        
+        auto &mv = world.getComponent<Movement>(entity);
+        auto &anim = world.getComponent<Animation>(entity);
+
         // ----------------------------------------------------------------------
-        // 1. DETERMINAÇÃO DO ESTADO (SRP: Traduz Movimento -> Estado Visual)
+        // 1. DETERMINAÇÃO DO ESTADO E GATILHO DE INICIALIZAÇÃO
         // ----------------------------------------------------------------------
 
+        // GATILHO CRÍTICO: Se a ID atual for 0 (default/não inicializada), force IDLE.
+        if (anim.currentAnimationID == 0)
+        {
+            anim.currentAnimationID = ANIM_IDLE;
+            anim.previousAnimationID = ANIM_IDLE;
+            anim.blendFactor = 1.0f; // Força o estado IDLE a ser 100% visível
+        }
+
         uint32_t desiredAnimID;
-        // Se a velocidade for maior que um pequeno epsilon ou estiver se movendo por CTM
         bool isMoving = (mv.currentVelocity > 0.01f) || mv.isMovingToDestination;
-        
-        if (isMoving) {
+
+        if (isMoving)
+        {
             desiredAnimID = ANIM_RUN;
-        } else {
+        }
+        else
+        {
             desiredAnimID = ANIM_IDLE;
         }
 
         // ----------------------------------------------------------------------
-        // 2. LÓGICA DE TRANSIÇÃO E BLEND (SRP: Suavização)
+        // 2. LÓGICA DE TRANSIÇÃO E BLEND
         // ----------------------------------------------------------------------
 
         if (desiredAnimID != anim.currentAnimationID)
@@ -70,7 +78,6 @@ void AnimationSystem::update(World &world, float dt)
                 anim.previousAnimationID = anim.currentAnimationID;
                 anim.currentAnimationID = desiredAnimID;
                 anim.blendFactor = 0.0f; // Inicia a transição
-                // Log::Debug(std::format("[AnimSystem] Transicionando para ID: {}", desiredAnimID));
             }
         }
 
@@ -82,12 +89,12 @@ void AnimationSystem::update(World &world, float dt)
         }
 
         // ----------------------------------------------------------------------
-        // 3. CÁLCULO DE FRAMES (Placeholder para o Core de Animação)
+        // 3. CÁLCULO DE FRAMES (Avance o Tempo e Calcule a Pose)
         // ----------------------------------------------------------------------
-        
+
         // Atualiza o tempo da animação (simplesmente avança o contador)
-        anim.currentTime += dt; 
-        
+        anim.currentTime += dt;
+
         // Busca o modelo
         std::shared_ptr<Model> model = m_assetManager.getModel(anim.animationAssetID);
 
@@ -95,19 +102,18 @@ void AnimationSystem::update(World &world, float dt)
         {
             // O Utilitário faz o cálculo complexo
             AnimationUtils::calculateBoneTransforms(
-                model, 
-                anim.currentAnimationID, 
-                anim.previousAnimationID, 
-                anim.currentTime, 
-                anim.blendFactor, 
-                anim.finalBoneTransforms
-            );
-        }       
-        
+                model,
+                anim.currentAnimationID,
+                anim.previousAnimationID,
+                anim.currentTime,
+                anim.blendFactor,
+                anim.finalBoneTransforms);
+        }
+
         // Por enquanto, garantimos que o vetor de transforms finais está pronto para o Renderer
         if (anim.finalBoneTransforms.empty())
         {
-             anim.finalBoneTransforms.resize(Animation::MAX_BONES, glm::mat4(1.0f));
+            anim.finalBoneTransforms.resize(Animation::MAX_BONES, glm::mat4(1.0f));
         }
     }
 }

@@ -13,6 +13,12 @@
       "description": "Modelo de personagem padrão."
     },
     {
+      "name": "character_test.glb",
+      "type": "Model",
+      "path": "character_test.glb",
+      "description": "Modelo de personagem teste."
+    },
+    {
       "name": "TER_Forest_Base.glb",
       "type": "Model",
       "path": "test_scene_1.glb",

@@ -1,6 +1,6 @@
 // src/app/scene.cpp
 #define GLFW_INCLUDE_NONE
-// #include <glad/gl.h>
+
 #include "../../engine/render/opengl_types.h"
 #include <GLFW/glfw3.h>
 

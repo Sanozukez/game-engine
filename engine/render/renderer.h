@@ -62,12 +62,15 @@ namespace Engine
             void setGlobalLightColor(const glm::vec3 &color);
             void setGlobalLightIntensity(float intensity);
 
+            // NOVO: Adiciona o getter para a câmera (CORREÇÃO C2039)
+            Engine::Camera::ICamera &getCamera() { return m_camera; }
+
         private:
             const Window &m_window;
             Camera::ICamera &m_camera;
 
             // MEMBRO NECESSÁRIO: O Renderer é o responsável pelo ownership do shader padrão.
-            std::unique_ptr<Engine::Render::Shader> m_defaultShader; // <--- AGORA DECLARADO!
+            // std::unique_ptr<Engine::Render::Shader> m_defaultShader; // <--- AGORA DECLARADO!
 
             glm::vec3 m_globalLightPos = glm::vec3(50.0f, 50.0f, 50.0f);
             glm::vec3 m_globalLightColor = glm::vec3(1.0f, 1.0f, 1.0f);

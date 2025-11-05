@@ -10,65 +10,8 @@
 #include <algorithm> // NOVO: Necessário para std::transform
 #include <cctype>    // NOVO: Necessário para std::tolower
 
-#include <glm/gtx/matrix_decompose.hpp> // para glm::decompose
-
 using namespace Engine::Asset;
 using namespace Engine::ECS::Component;
-
-// --- DECLARAÇÕES ANTECIPADAS (prototypes) ---
-// 1) calculateBoneTransform (singular) - usado por localFromClipOrRest
-static glm::mat4 calculateBoneTransform(
-    uint32_t currentClipID,
-    const std::string &boneName,
-    float currentTime,
-    const std::shared_ptr<Model> &model);
-
-// 2) localFromClipOrRest - usado por readNodeHierarchy
-static glm::mat4 localFromClipOrRest(
-    uint32_t clipID,
-    const std::string &boneName,
-    float currentTime,
-    const std::shared_ptr<Model> &model);
-
-// 3) readNodeHierarchy - usado por calculateBoneTransforms (método da classe)
-static void readNodeHierarchy(
-    const std::shared_ptr<Model> &model,
-    uint32_t currentClipID,
-    uint32_t previousClipID,
-    float currentTime,
-    float blendFactor,
-    std::vector<glm::mat4> &finalBoneTransforms,
-    const std::string &nodeName,
-    const glm::mat4 &parentTransform);
-
-// --- helper local: decompose + compose ---------------------------------
-static void decomposeTRS(const glm::mat4 &m, glm::vec3 &T, glm::quat &R, glm::vec3 &S)
-{
-    glm::vec3 skew;
-    glm::vec4 persp;
-    glm::decompose(m, S, R, T, skew, persp);
-    R = glm::normalize(R);
-}
-static glm::mat4 composeTRS(const glm::vec3 &T, const glm::quat &R, const glm::vec3 &S)
-{
-    glm::mat4 M(1.0f);
-    M = glm::translate(M, T);
-    M *= glm::mat4_cast(R);
-    M = glm::scale(M, S);
-    return M;
-}
-
-static bool channelIsNearZero(const std::vector<KeyFrame<glm::vec3>> &positionKeys, float eps = 1e-5f)
-{
-    if (positionKeys.empty())
-        return true;
-    for (const auto &k : positionKeys)
-    {
-        if (glm::length(k.value) > eps)
-            return false;
-    }
-    return true; // todos próximos de zero
-}
 
 // ----------------------------------------------------------------------
 // 1. Implementação do Hash ID
@@ -114,15 +57,15 @@ static glm::mat4 lerp(const glm::mat4 &x, const glm::mat4 &y, float a)
 }
 
 // NOVO: Declaração antecipada com os novos 4 argumentos de animação
-// static void readNodeHierarchy(
-//     const std::shared_ptr<Model> &model,
-//     uint32_t currentClipID,
-//     uint32_t previousClipID,
-//     float currentTime,
-//     float blendFactor,
-//     std::vector<glm::mat4> &finalBoneTransforms,
-//     const std::string &nodeName,
-//     const glm::mat4 &parentTransform);
+static void readNodeHierarchy(
+    const std::shared_ptr<Model> &model,
+    uint32_t currentClipID,
+    uint32_t previousClipID,
+    float currentTime,
+    float blendFactor,
+    std::vector<glm::mat4> &finalBoneTransforms,
+    const std::string &nodeName,
+    const glm::mat4 &parentTransform);
 
 // ----------------------------------------------------------------------
 // FUNÇÕES AUXILIARES DE ANIMAÇÃO (DECLARAÇÕES ANTECIPADAS)
@@ -130,11 +73,11 @@ static glm::mat4 lerp(const glm::mat4 &x, const glm::mat4 &y, float a)
 // É essencial que a assinatura de 'calculateBoneTransform' esteja visível
 // antes de 'readNodeHierarchy' usá-la.
 
-// static glm::mat4 calculateBoneTransform(
-//     uint32_t currentClipID,
-//     const std::string &boneName,
-//     float currentTime,
-//     const std::shared_ptr<Model> &model);
+static glm::mat4 calculateBoneTransform(
+    uint32_t currentClipID,
+    const std::string &boneName,
+    float currentTime,
+    const std::shared_ptr<Model> &model);
 
 // ----------------------------------------------------------------------
 // FUNÇÃO AUXILIAR: Traversa a Hierarquia de Nodos (Cinemática Forward)
@@ -149,89 +92,85 @@ static void readNodeHierarchy(
     const std::string &nodeName,
     const glm::mat4 &parentTransform)
 {
-    const bool isSkeletonBone = model->getBoneIndexByName(nodeName) != -1;
+    // 0. Verifica se o nó é um bone do esqueleto.
+    bool isSkeletonBone = model->getBoneIndexByName(nodeName) != -1;
 
-    // 1) SEMPRE comece do restLocal
-    glm::mat4 restLocal = model->getNodeLocalTransform(nodeName);
+    // 1. Pega a transformação local estática (T, R, S do GLTF) como base.
+    glm::mat4 nodeTransform = model->getNodeLocalTransform(nodeName);
 
-    // 2) Poses "current" e "previous" por TRS (ou rest se não houver canal)
-    glm::mat4 currentLocal = localFromClipOrRest(currentClipID, nodeName, currentTime, model);
-    glm::mat4 previousLocal = localFromClipOrRest(previousClipID, nodeName, currentTime, model);
-
-    // 3) Se não há blending, use currentLocal direto
-    glm::mat4 nodeLocal = currentLocal;
-
-    // 4) Se há blending (0..1), faça BLEND POR TRS
-    if (previousClipID != 0 && blendFactor < 1.0f)
-    {
-        glm::vec3 Ta, Sa, Tb, Sb;
-        glm::quat Ra, Rb;
-        decomposeTRS(previousLocal, Ta, Ra, Sa);
-        decomposeTRS(currentLocal, Tb, Rb, Sb);
-
-        glm::vec3 T = glm::mix(Ta, Tb, blendFactor);
-        glm::quat R = glm::normalize(glm::slerp(Ra, Rb, blendFactor));
-        glm::vec3 S = glm::mix(Sa, Sb, blendFactor);
-
-        nodeLocal = composeTRS(T, R, S);
-    }
-
-    // 5) Global = Parent * Local
-    glm::mat4 globalTransform = parentTransform * nodeLocal;
-
-    // 6) (debug) armazenar global do node
-    model->setNodeGlobalTransform(nodeName, globalTransform);
-
-    // 7) Se for joint do skin → Final = Global * IBM
+    // CORREÇÃO CRÍTICA (Fixa o Colapso/Bind Pose):
+    // Se for um bone, a transformação estática inicial DEVE ser Identity.
+    // Isso anula a matriz de transformação do objeto Armature, que é a causa do colapso.
     if (isSkeletonBone)
     {
-        const auto &map = model->getBoneInfoMap();
-        auto it = map.find(nodeName);
-        if (it != map.end())
-        {
-            const BoneInfo &info = it->second;
-            finalBoneTransforms[info.id] = globalTransform * info.offset;
+        nodeTransform = glm::mat4(1.0f);
+    }
 
-            if (nodeName == "spine" || nodeName == "spine.001")
-            {
-                glm::vec3 gT = glm::vec3(globalTransform[3]);
-                glm::vec3 fT = glm::vec3(finalBoneTransforms[info.id][3]);
-                Engine::Core::Log::Info(std::format(
-                    "[FINAL_T] bone={} globalT=({:.4f},{:.4f},{:.4f}) finalT=({:.4f},{:.4f},{:.4f})",
-                    nodeName, gT.x, gT.y, gT.z, fT.x, fT.y, fT.z));
-            }
+    // Variáveis auxiliares
+    glm::mat4 animatedPose = glm::mat4(1.0f);
+    glm::mat4 previousAnimatedPose = glm::mat4(1.0f);
+
+    // 2. CÁLCULO DA POSE ANIMADA ATUAL
+    if (currentClipID != 0)
+    {
+        // A animação só afeta os bones
+        if (isSkeletonBone)
+        {
+            animatedPose = calculateBoneTransform(
+                currentClipID, nodeName, currentTime, model);
+        }
+
+        // Se a pose animada foi calculada (não é Identity), aplique-a.
+        if (animatedPose != glm::mat4(1.0f))
+        {
+            nodeTransform = animatedPose; // Aplica a pose animada (T, R, S keyframes)
+        }
+        // Se animatedPose for Identity: nodeTransform MANTÉM Identity (se for bone)
+        // ou a Transformação Local Estática (se não for bone). CORRETO.
+    }
+
+    // 3. LÓGICA DE BLEND:
+    if (previousClipID != 0 && blendFactor < 1.0f)
+    {
+        if (isSkeletonBone)
+        {
+            previousAnimatedPose = calculateBoneTransform(
+                previousClipID, nodeName, currentTime, model);
+        }
+
+        if (previousAnimatedPose != glm::mat4(1.0f))
+        {
+            // O blend é feito entre a pose ANTERIOR e a pose ATUAL (nodeTransform)
+            nodeTransform = lerp(previousAnimatedPose, nodeTransform, blendFactor);
         }
     }
 
-    // 8) Recursão
-    for (const auto &childName : model->getNodeChildren(nodeName))
+    // 4. Calcula a Transformação Global (Model Space): Global = Pai Global * Local
+    glm::mat4 globalTransform = parentTransform * nodeTransform;
+
+    // 5. Armazena a Transformação Global do Nó (para Debug Lines)
+    model->setNodeGlobalTransform(nodeName, globalTransform);
+
+    // 6. Calcula a matriz final para o shader: Final = Global * IBM
+    int boneIndex = model->getBoneIndexByName(nodeName);
+    if (boneIndex != -1)
     {
-        readNodeHierarchy(model, currentClipID, previousClipID, currentTime, blendFactor,
-                          finalBoneTransforms, childName, globalTransform);
+        const auto &boneInfoMap = model->getBoneInfoMap();
+        if (boneInfoMap.count(nodeName))
+        {
+            const BoneInfo &boneInfo = boneInfoMap.at(nodeName);
+
+            // BoneFinal = GlobalTransform (Animada) * InverseBindMatrix (IBM)
+            finalBoneTransforms[boneInfo.id] = globalTransform * boneInfo.offset;
+        }
     }
-}
 
-// --- helper local: retorna local TRS do clip ou restLocal se não houver canal ---
-static glm::mat4 localFromClipOrRest(uint32_t clipID,
-                                     const std::string &boneName,
-                                     float currentTime,
-                                     const std::shared_ptr<Model> &model)
-{
-    // restLocal SEMPRE como base
-    glm::mat4 restLocal = model->getNodeLocalTransform(boneName);
-
-    // sem clip? volta rest
-    const AnimationClip *clip = model->getAnimationClip(clipID);
-    if (!clip)
-        return restLocal;
-
-    // sem canal? volta rest
-    if (!clip->boneChannels.count(boneName))
-        return restLocal;
-
-    // tem canal → sua função monta TRS respeitando rest
-    glm::mat4 animLocal = calculateBoneTransform(clipID, boneName, currentTime, model);
-    return animLocal; // já é TRS coerente
+    // 7. Continua recursivamente para os filhos
+    const std::vector<std::string> children = model->getNodeChildren(nodeName);
+    for (const auto &childName : children)
+    {
+        readNodeHierarchy(model, currentClipID, previousClipID, currentTime, blendFactor, finalBoneTransforms, childName, globalTransform);
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -272,8 +211,7 @@ void AnimationUtils::calculateBoneTransforms(
         blendFactor,
         finalBoneTransforms,
         model->getSkeletonRootName(),
-        model->getSkeletonBindTransform() // <-- usa o bind real do skin.skeleton
-    );
+        glm::mat4(1.0f));
 }
 
 // ----------------------------------------------------------------------
@@ -354,65 +292,74 @@ static glm::mat4 calculateBoneTransform(
 
     const BoneChannel &channel = clip->boneChannels.at(boneName);
 
-    // Rest pose
-    glm::mat4 localRestTransform = model->getNodeLocalTransform(boneName);
-    glm::vec3 restPos = glm::vec3(localRestTransform[3]);
-    glm::quat restRot = glm::quat_cast(localRestTransform);
-    glm::vec3 restScale = glm::vec3(localRestTransform[0][0], localRestTransform[1][1], localRestTransform[2][2]);
-
-    // Inicia com REST (sempre)
-    glm::vec3 position = restPos;
-    Engine::Math::Quat rotation = Engine::Math::Quat(restRot);
-    glm::vec3 scale = restScale;
-
-    // Tempo
+    // NOTA: Para ciclos, o tempo deve ser ajustado: currentTime = fmod(currentTime, clip->duration);
     float animTime = 0.0f;
     if (clip->duration > 0.0001f)
     {
-        animTime = std::fmod(currentTime, clip->duration);
+        animTime = std::fmod(currentTime, clip->duration); // CORREÇÃO: Removido o 'float'
     }
 
-    // -------- Translation: só o ROOT pode substituir --------
-    bool isRoot = (boneName == model->getSkeletonRootName());
-    int prev = 0, next = 0;
+    // Log de Verificação (ADICIONAR PARA DEBUG)
+    if (boneName == model->getSkeletonRootName())
+    {
+        Engine::Core::Log::Info(std::format("[ANIM_DEBUG] ROOT: {}, Time: {:.2f}/{:.2f}",
+                                            boneName,
+                                            animTime,
+                                            clip->duration));
+    }
+
+    // 1. Extrair T, R, S da Transformação Local Estática (Rest Pose)
+    glm::mat4 localRestTransform = model->getNodeLocalTransform(boneName);
+
+    // Inicialização da Pose (Componentes)
+    glm::vec3 position = glm::vec3(localRestTransform[3]);                                                     // Translação
+    glm::quat defaultR = glm::quat_cast(localRestTransform);                                                   // Rotação (glm::quat)
+    glm::vec3 scale = glm::vec3(localRestTransform[0][0], localRestTransform[1][1], localRestTransform[2][2]); // Escala (simplificada)
+
+    // A rotação da Engine (Engine::Math::Quat) deve ser inicializada com a Rest Pose.
+    Engine::Math::Quat rotation = Engine::Math::Quat(defaultR);
+
+    // Declaração e inicialização segura das variáveis de índice.
+    int prev = 0;
+    int next = 0;
     float factor = 0.0f;
 
-    if (isRoot && !channel.positionKeys.empty() &&
-        findKeyframePair(animTime, channel.positionKeys, prev, next, factor))
+    // 2. Posição (Translation) - Substitui o valor da Rest Pose se existir
+    if (findKeyframePair(animTime, channel.positionKeys, prev, next, factor))
     {
-        glm::vec3 p0 = channel.positionKeys[prev].value;
-        glm::vec3 p1 = channel.positionKeys[next].value;
-        glm::vec3 animPos = glm::mix(p0, p1, factor);
-        position = animPos; // root pode realmente mover o personagem
+        position = glm::mix(channel.positionKeys[prev].value, channel.positionKeys[next].value, factor);
     }
-    // Para todo osso não-root, mantemos position = restPos (ignora T animada)
 
-    // Rotação (substitui)
-    prev = next = 0;
+    // 3. Rotação (Rotation - SLERP) - Substitui o valor da Rest Pose se existir
+    // Reinicia indices para o próximo Keyframe
+    prev = 0;
+    next = 0;
     factor = 0.0f;
-    if (!channel.rotationKeys.empty() &&
-        findKeyframePair(animTime, channel.rotationKeys, prev, next, factor))
+    if (findKeyframePair(animTime, channel.rotationKeys, prev, next, factor))
     {
         Engine::Math::Quat q1 = channel.rotationKeys[prev].value;
         Engine::Math::Quat q2 = channel.rotationKeys[next].value;
+
+        // CORREÇÃO C2039: O resultado é Engine::Math::Quat. Atribui diretamente.
         rotation = Engine::Math::Quat::slerp(q1, q2, factor);
     }
 
-    // Escala (substitui)
-    prev = next = 0;
+    // 4. Escala (Scale) - Substitui o valor da Rest Pose se existir
+    // Reinicia indices para o próximo Keyframe
+    prev = 0;
+    next = 0;
     factor = 0.0f;
-    if (!channel.scaleKeys.empty() &&
-        findKeyframePair(animTime, channel.scaleKeys, prev, next, factor))
+    if (findKeyframePair(animTime, channel.scaleKeys, prev, next, factor))
     {
-        glm::vec3 s0 = channel.scaleKeys[prev].value;
-        glm::vec3 s1 = channel.scaleKeys[next].value;
-        scale = glm::mix(s0, s1, factor);
+        scale = glm::mix(channel.scaleKeys[prev].value, channel.scaleKeys[next].value, factor);
     }
 
-    // Compose TRS
-    glm::mat4 localTransform(1.0f);
+    // 5. Constrói a Matriz Local: Translação * Rotação * Escala
+    glm::mat4 localTransform = glm::mat4(1.0f);
     localTransform = glm::translate(localTransform, position);
-    localTransform *= rotation.toMat4();
+    // O método toMat4() é usado no lugar de glm::mat4_cast(rotation), pois rotation é Engine::Math::Quat.
+    localTransform = localTransform * rotation.toMat4();
     localTransform = glm::scale(localTransform, scale);
+
     return localTransform;
 }

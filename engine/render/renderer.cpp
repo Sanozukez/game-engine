@@ -9,6 +9,7 @@
 #include "../ecs/components/transform_component.h" // Para usar Transform no submit
 #include "../asset/asset_manager.h"
 #include "../asset/model.h"
+#include "shader_manager.h"
 #include "../core/path_utils.h"
 
 #include "opengl_types.h"
@@ -20,18 +21,20 @@ namespace Engine
     namespace Render
     {
 
-        // --- MUDANÇA: O construtor aceita uma referência não-constante ---
         Renderer::Renderer(const Window &window, Camera::ICamera &camera)
             : m_window(window), m_camera(camera)
         {
+            // NOVO: A inicialização do ShaderManager é movida para o AppSetup
+            // O Renderer agora só acessa o shader via manager (SRP)
 
-            std::string vs_path = Engine::resolveEnginePath("engine/shaders/basic.vert").string();
-            std::string fs_path = Engine::resolveEnginePath("engine/shaders/basic.frag").string();
-            m_defaultShader = std::make_unique<Shader>(vs_path.c_str(), fs_path.c_str());
+            // REMOVA: std::string vs_path = Engine::resolveEnginePath("engine/shaders/basic.vert").string();
+            // REMOVA: std::string fs_path = Engine::resolveEnginePath("engine/shaders/basic.frag").string();
+            // REMOVA: m_defaultShader = std::make_unique<Shader>(vs_path.c_str(), fs_path.c_str());
 
-            Engine::Core::Log::Info(std::format("Renderer: Construtor chamado. Shader PBR 'basic' inicializado."));
+            // Engine::Core::Log::Info(std::format("Renderer: Construtor chamado. Shader PBR 'basic' inicializado."));
+            Engine::Core::Log::Info("Renderer: Construtor chamado. Shaders gerenciados por ShaderManager.");
 
-            // FUTURE: Você precisará carregar os arquivos de shader reais aqui.
+            // O m_defaultShader não é mais necessário se você usar o manager
         }
 
         // --- IMPLEMENTAÇÃO DOS NOVOS SETTERS DE LUZ (SOLUÇÃO C2039) ---
@@ -57,7 +60,8 @@ namespace Engine
         Engine::Render::Shader &Renderer::getActiveShader()
         {
             // Retorna o shader padrão que foi inicializado no construtor.
-            return *m_defaultShader;
+            //return *m_defaultShader;
+            return Engine::Render::ShaderManager::Get().getActiveShader();
         }
 
         Renderer::~Renderer()

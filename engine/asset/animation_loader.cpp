@@ -4,8 +4,10 @@
 #include "asset_manager.h"
 #include "../core/log.h"
 #include "../deps/cgltf/cgltf.h"
+#include "../asset/animation_utils.h"
 #include <glm/gtc/type_ptr.hpp> // Para glm::make_mat4
 #include <glm/gtx/quaternion.hpp>
+#include <unordered_set>
 
 using namespace Engine::Asset;
 
@@ -17,13 +19,18 @@ static glm::mat4 getGltfNodeTransform(const cgltf_node *node)
     {
         matrix = glm::make_mat4(node->matrix);
     }
-    else // <--- NOVO: Leitura de T, R, S
+    else
     {
         glm::vec3 T = node->has_translation ? glm::make_vec3(node->translation) : glm::vec3(0.0f);
-        glm::quat R = node->has_rotation ? glm::make_quat(node->rotation) : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+        // ANTES (errado): glm::make_quat(node->rotation)
+        // DEPOIS (certo): glTF = (x,y,z,w)  → GLM quat(w,x,y,z)
+        glm::quat R = node->has_rotation
+                          ? glm::quat(node->rotation[3], node->rotation[0], node->rotation[1], node->rotation[2])
+                          : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
         glm::vec3 S = node->has_scale ? glm::make_vec3(node->scale) : glm::vec3(1.0f);
 
-        // Constrói a matriz: Translação * Rotação * Escala
         matrix = glm::translate(glm::mat4(1.0f), T);
         matrix *= glm::mat4_cast(R);
         matrix = glm::scale(matrix, S);
@@ -79,26 +86,60 @@ int AnimationLoader::processGltfSkins(
     }
 
     // 2. PREENCHER O MODEL COM BONE INFO
+    int rootNodeIndex = -1; // Índice GLTF do nó raiz.
+    std::string detectedRootName = "";
+    bool rootFound = false;
+
     for (size_t i = 0; i < skin->joints_count; ++i)
     {
         const cgltf_node *joint = skin->joints[i];
 
-        // Garante que o índice não exceda o vetor de IBMs.
         glm::mat4 ibm = (i < inverseBindMatrices.size()) ? inverseBindMatrices[i] : glm::mat4(1.0f);
 
         std::string boneName = joint->name ? joint->name : std::string("Bone_") + std::to_string(i);
 
-        model.addBone(boneName, ibm);
+        model.addBone(boneName, ibm, static_cast<int>(i));
 
-        // 3. Define o nó raiz (o primeiro nó da lista de joints é frequentemente o raiz)
-        if (i == 0)
+        // 3. NOVO: Priorizar o nó raiz pela nomenclatura, se ainda não encontrado.
+        if (!rootFound && Engine::Asset::AnimationUtils::IsRootBoneName(boneName))
         {
-            model.setSkeletonRootName(boneName);
+            detectedRootName = boneName;
+            rootNodeIndex = static_cast<int>(joint - data->nodes);
+            rootFound = true; // Define o primeiro match como o Root Bone e para de procurar.
+            // Não mais define model.setSkeletonRootName(boneName) aqui.
+            // Fazemos isso no final para garantir que a lógica de fallback seja aplicada.
         }
     }
 
-    // Retorna o índice do nó raiz (o primeiro joint)
-    return skin->joints_count > 0 ? (skin->joints[0] - data->nodes) : -1;
+    // 4. Lógica de Fallback: Se a busca por "root" falhou, retorna à lógica original (o primeiro joint).
+    if (!rootFound && skin->joints_count > 0)
+    {
+        const cgltf_node *firstJoint = skin->joints[0];
+        detectedRootName = firstJoint->name ? firstJoint->name : std::string("Bone_0");
+        rootNodeIndex = static_cast<int>(firstJoint - data->nodes);
+    }
+
+    // 5. Salvar o nome detectado no Model.
+    if (!detectedRootName.empty())
+    {
+        model.setSkeletonRootName(detectedRootName);
+        Engine::Core::Log::Info(std::format("[AnimLoader] Nó Raiz do Esqueleto definido como: {}.", detectedRootName));
+    }
+    // else { Log de erro se for vazio e o modelo tem joints. }
+    {
+        const auto &map = model.getBoneInfoMap();
+        Engine::Core::Log::Info(std::format("[BONE_MAP] total={} (listando ate 64)", map.size()));
+        int printed = 0;
+        for (const auto &kv : map)
+        {
+            Engine::Core::Log::Info(std::format("  [BONE_MAP] name='{}' id={}", kv.first, kv.second.id));
+            if (++printed >= 64)
+                break;
+        }
+    }
+
+    // Retorna o índice GLTF do nó raiz para a próxima função (traverseAndStoreHierarchy).
+    return rootNodeIndex;
 }
 
 // --------------------------------------------------------------------------------
@@ -227,8 +268,17 @@ void AnimationLoader::traverseAndStoreHierarchy(
             node->children[i]->name ? node->children[i]->name : std::string("Node_") + std::to_string(node->children[i] - data->nodes));
     }
     model.addNode(nodeData); // <--- ARMAZENA NO MODEL
+    // ⬇️ LOG opcional: verificando se o hips/pelvis tem rest T≠0
+    if (nodeData.name == std::string("spine") || nodeData.name == std::string("spine.001"))
+    {
+        glm::vec3 restT = glm::vec3(nodeData.localTransform[3]);
+        Engine::Core::Log::Info(std::format(
+            "[HIER_REST] node={} restT=({:.4f},{:.4f},{:.4f})",
+            nodeData.name, restT.x, restT.y, restT.z));
+    }
 
     // 3. Processa filhos recursivamente
+    Engine::Core::Log::Info(std::format("[AnimLoader] Encontrado {} clipes de animação.", data->animations_count));
     for (cgltf_size i = 0; i < node->children_count; ++i)
     {
         traverseAndStoreHierarchy(node->children[i], data, model);
@@ -238,22 +288,86 @@ void AnimationLoader::traverseAndStoreHierarchy(
 // --------------------------------------------------------------------------------
 // FUNÇÃO PRINCIPAL: processAnimationData
 // --------------------------------------------------------------------------------
-int AnimationLoader::processAnimationData(
-    const cgltf_data *data,
-    Engine::Asset::Model &model)
+int AnimationLoader::processAnimationData(const cgltf_data *data, Engine::Asset::Model &model)
 {
-    // 1. Processa a estrutura de Skeleton/Bones
+    // 1. Processa a estrutura básica de bones
     int rootIndex = processGltfSkins(data, model);
 
-    // 2. Traversa a hierarquia de nodos (a partir do root)
-    if (rootIndex != -1)
+    // NOVO: capturar a matriz do skin->skeleton (se houver)
+    glm::mat4 skeletonBind = glm::mat4(1.0f);
+    const cgltf_skin *skin = (data->skins_count > 0) ? &data->skins[0] : nullptr;
+    if (skin && skin->skeleton)
     {
-        // Pega o nó raiz do esqueleto
-        const cgltf_node *rootNode = &data->nodes[rootIndex];
-        traverseAndStoreHierarchy(rootNode, data, model);
+        skeletonBind = getGltfNodeTransform(skin->skeleton);
+        Engine::Core::Log::Info(
+            std::format("[SKEL_BIND] skin.skeleton='{}' T=({:.4f},{:.4f},{:.4f})",
+                        (skin->skeleton->name ? skin->skeleton->name : "(unnamed)"),
+                        skeletonBind[3].x, skeletonBind[3].y, skeletonBind[3].z));
+    }
+    model.setSkeletonBindTransform(skeletonBind);
+
+    // LOG: tamanho do mapa de ossos
+    {
+        const auto &map = model.getBoneInfoMap();
+        Engine::Core::Log::Info(std::format("[BONE_MAP] total_bones={} skins_count={}", map.size(), data->skins_count));
+
+        auto logIf = [&](const char *name)
+        {
+            if (map.count(name))
+            {
+                Engine::Core::Log::Info(std::format("[BONE_MAP] {} id={}", name, map.at(name).id));
+            }
+            else
+            {
+                Engine::Core::Log::Info(std::format("[BONE_MAP] {} NAO encontrado no BoneInfoMap", name));
+            }
+        };
+        logIf("root");
+        logIf("spine");
+        logIf("spine.001");
+        logIf("pelvis.L");
+        logIf("pelvis.R");
     }
 
-    // 3. NOVO: Processa os clipes de Keyframe (o novo SRP)
+    // const cgltf_skin *skin = (data->skins_count > 0) ? &data->skins[0] : nullptr;
+
+    // --- Nova abordagem: multi-root traversal ---
+    if (skin)
+    {
+        // cria set com todos os joints do skin
+        std::unordered_set<const cgltf_node *> jointSet;
+        jointSet.reserve(skin->joints_count);
+        for (cgltf_size i = 0; i < skin->joints_count; ++i)
+            jointSet.insert(skin->joints[i]);
+
+        // detecta possíveis roots (sem pai dentro do mesmo skin)
+        std::vector<const cgltf_node *> skeletonRoots;
+        for (cgltf_size i = 0; i < skin->joints_count; ++i)
+        {
+            const cgltf_node *j = skin->joints[i];
+            const cgltf_node *parent = j->parent;
+
+            bool parentIsJoint = parent && jointSet.count(parent);
+            if (!parentIsJoint)
+            {
+                skeletonRoots.push_back(j);
+                Engine::Core::Log::Info(std::format(
+                    "[AnimLoader] Multi-root detectado: {}", j->name ? j->name : "(null)"));
+            }
+        }
+
+        // percorre todos os roots encontrados
+        for (const cgltf_node *r : skeletonRoots)
+        {
+            traverseAndStoreHierarchy(r, data, model);
+        }
+    }
+    else
+    {
+        Engine::Core::Log::Warn("[AnimLoader] Nenhum skin encontrado no GLTF!");
+    }
+
+    // 2. Clipes de animação
     processAnimationClips(data, model);
 
     return rootIndex;

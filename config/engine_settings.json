@@ -21,7 +21,7 @@
   },
   "character": {
     "player": {
-      "model_name": "character_placeholder.glb",
+      "model_name": "character_test.glb",
       "movement_speed": 5.5,
       "rotation_speed_degrees": 80.0,
       "camera_focus_height": 1.2,
@@ -56,8 +56,17 @@
   },
   "rendering": {
     "default_shader": {
+      "name": "AnimatedPBR",
       "vertex_path": "engine/shaders/animated.vert",
       "fragment_path": "engine/shaders/basic.frag"
-    }
+    },
+    "utility_shaders": [
+      {
+        "name": "armature",
+        "vertex_path": "engine/shaders/armature.vert",
+        "fragment_path": "engine/shaders/armature.frag"
+      }
+    ]
   }
+  
 }

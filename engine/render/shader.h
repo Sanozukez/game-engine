@@ -3,6 +3,7 @@
 
 #include <string>
 #include "opengl_types.h"
+#include "../render/opengl_types.h"
 #include <glm/glm.hpp>
 
 namespace Engine { 

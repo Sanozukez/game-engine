@@ -1,5 +1,6 @@
 // // engine/core/app_setup.cpp
 
+#include "../../engine/render/opengl_types.h"
 #include "app_setup.h"
 #include "./../../core/log.h"
 #include "./../../ecs/systems/player_system.h"
@@ -10,10 +11,11 @@
 #include "./../../input/input_service.h"
 #include "./../../ecs/components/all_components.h" // Incluir todos os componentes
 #include "./../../ecs/components/component_signature.h"
-#include "./../../camera/orbit_camera.h" // <--- INCLUSÃO CRÍTICA (OrbitCamera)
+#include "./../../camera/orbit_camera.h"
 #include "./../../ecs/components/camera_input_component.h"
 #include "./../../engine/core/config_manager.h" // Importar para acessar o JSON
 #include "./../../engine/asset/asset_manager.h"
+#include "./../../engine/render/shader_manager.h"
 
 #include "./../../input/i_keyboard_listener.h"
 #include "./../../input/i_mouse_listener.h"
@@ -51,6 +53,10 @@ namespace Engine
             Engine::Camera::OrbitCamera *orbitCameraPtr = nullptr;
 
             cameraRef.applyExternalConfig(config);
+
+            // NOVO: Inicializa o Shader Manager antes de tudo
+            Engine::Render::ShaderManager::Get().initialize(config); // <--- AÇÃO CRÍTICA (Linha 46 original)            
+            // ---------------------------------------------------------------------------------
 
             // --- CARREGAR LUZ GLOBAL (CORRIGIDO PARA USO DE JSON SEGURO) ---
             const auto &rootNode = config.getRootNode();
@@ -114,9 +120,13 @@ namespace Engine
             // config e assetManager foram lidos no topo, usaremos as variáveis
             // que estão no escopo (linhas 106-114 do seu código)
 
-            std::string playerModelName = config.getValue<std::string>("character.player.model_name", "character_placeholder.glb");
+            std::string playerModelName = config.getValue<std::string>("character.player.model_name", "character_test.glb");
             glm::vec3 startPos = config.getValue<glm::vec3>("character.player.start_position", glm::vec3(0.0f, 50.0f, 0.0f));
             const uint32_t playerAssetID = assetManager.getAssetIDByName(playerModelName);
+
+            // NOVO: Lê o nome do clipe IDLE (ou usa um fallback)
+            std::string idleClipName = "idle";                                         // Nome padrão do seu clipe no Blender/GLTF
+            const uint32_t IDLE_CLIP_ID = assetManager.getAssetIDByName(idleClipName); // Resolve o Hash ID
 
             if (playerAssetID == 0)
             {
@@ -125,7 +135,7 @@ namespace Engine
             }
 
             // --------------------------------------------------------------------------------
-            // 2. CRIAÇÃO E CONSTRUÇÃO EXPLÍCITA DOS COMPONENTES (RESOLUÇÃO DO C2672)
+            // 2. CRIAÇÃO E CONSTRUÇÃO EXPLÍCITA DOS COMPONENTES
             // --------------------------------------------------------------------------------
             Engine::ECS::EntityID playerEntity = world.createEntity();
 
@@ -144,11 +154,15 @@ namespace Engine
             // Inicializa o asset de animação com o mesmo assetID da Mesh.
             Component::Animation playerAnimConfig;
             playerAnimConfig.animationAssetID = playerAssetID;
-            // Define o ID da animação inicial (ex: "IDLE"). Precisaremos do hash em runtime.
-            // Por enquanto, usaremos um ID de fallback ou o hash de "IDLE" (hash("IDLE")).
-            // Vamos definir uma função de hash temporária ou usar o AssetManager se ele for adequado.
-            // Assumindo que você tem uma forma de fazer hash ou que o asset manager tem essa função:
-            playerAnimConfig.currentAnimationID = 0; // Temporário, será o hash de "IDLE"
+
+            // GATILHO CRÍTICO: Inicia a animação IDLE
+            playerAnimConfig.currentAnimationID = IDLE_CLIP_ID;
+            playerAnimConfig.previousAnimationID = IDLE_CLIP_ID;
+
+            // ** CORREÇÃO FINAL: Forçar o blendFactor a ser 1.0f (totalmente visível) **
+            playerAnimConfig.blendFactor = 1.0f;
+            playerAnimConfig.currentTime = 0.0f;
+
             world.addComponent<Animation>(playerEntity, playerAnimConfig);
 
             // Movement Componente (Configurado pelo JSON)

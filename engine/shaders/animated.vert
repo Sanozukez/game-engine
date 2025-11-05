@@ -1,13 +1,14 @@
-// engine/shaders/animated.vert
-
+// src/engine/shaders/animated.vert
+// (arquivo inteiro, atualizado com uNode)
 #version 330 core
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoords;
+layout (location = 3) in vec3 aTangent;
 
-// NOVOS ATRIBUTOS DE ANIMAÇÃO (A definir no Mesh::setupMesh)
-layout (location = 3) in ivec4 aBoneIDs; 
-layout (location = 4) in vec4 aWeights; 
+// Animação
+layout (location = 4) in ivec4 aBoneIDs;
+layout (location = 5) in vec4  aWeights;
 
 out vec3 FragPos;
 out vec3 Normal;
@@ -17,33 +18,34 @@ uniform mat4 uProjection;
 uniform mat4 uView;
 uniform mat4 uModel;
 
-// UNIFORMS DE ANIMAÇÃO
+// NEW: transform do nó da malha (onde o primitive está no glTF)
+uniform mat4 uNode;
+
 uniform bool uIsAnimated;
 const int MAX_BONES = 100;
-uniform mat4 uBoneTransforms[MAX_BONES]; // Recebe o array do Model::draw
+uniform mat4 uBoneTransforms[MAX_BONES];
 
 void main()
 {
-    mat4 finalBoneTransform = mat4(1.0f);
-    
-    // Lógica de Animação
-    if (uIsAnimated)
-    {
-        // Mistura as transformações de até 4 ossos (por vértice)
-        finalBoneTransform = aWeights.x * uBoneTransforms[aBoneIDs.x];
-        finalBoneTransform += aWeights.y * uBoneTransforms[aBoneIDs.y];
-        finalBoneTransform += aWeights.z * uBoneTransforms[aBoneIDs.z];
-        finalBoneTransform += aWeights.w * uBoneTransforms[aBoneIDs.w];
+    mat4 skin = mat4(1.0);
+    if (uIsAnimated) {
+        skin  = aWeights.x * uBoneTransforms[aBoneIDs.x];
+        skin += aWeights.y * uBoneTransforms[aBoneIDs.y];
+        skin += aWeights.z * uBoneTransforms[aBoneIDs.z];
+        skin += aWeights.w * uBoneTransforms[aBoneIDs.w];
     }
 
-    // Se não for animado, finalBoneTransform é Identity (1.0f), o que é correto.
+    // A matriz da malha é uModel * uNode (instância * nó da cena)
+    mat4 M = uModel * uNode * skin;
 
-    // Calcula a posição final do vértice
-    mat4 modelMatrix = uModel * finalBoneTransform;
-    
-    FragPos = vec3(modelMatrix * vec4(aPos, 1.0));
-    Normal = mat3(modelMatrix) * aNormal; // Multiplicação correta da normal
+    vec4 worldPos = M * vec4(aPos, 1.0);
+    FragPos = worldPos.xyz;
+
+    // normal: usar inverse-transpose de M sem translação
+    mat3 N = mat3(transpose(inverse(M)));
+    Normal = normalize(N * aNormal);
+
     TexCoords = aTexCoords;
-    
-    gl_Position = uProjection * uView * vec4(FragPos, 1.0);
+
+    gl_Position = uProjection * uView * worldPos;
 }

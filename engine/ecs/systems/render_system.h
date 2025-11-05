@@ -1,11 +1,14 @@
-// // engine/ecs/systems/render_system.h (CORRIGIDO: Apenas Declarações)
+// // engine/ecs/systems/render_system.h
 
 #pragma once
 
 #include "base_system.h"
+#include "../../render/renderer.h"
+#include "../../render/armature_renderer.h" // Incluído para a instância
+#include "../../asset/asset_manager.h"      // Necessário para o membro m_assetManager
 #include "../components/transform_component.h"
-#include "../../render/renderer.h" // Mantemos o include para o compilador do RenderSystem.cpp
-#include "../components/animation_component.h"
+#include "../components/animation_component.h" // Para usar Component::Animation
+#include "../components/mesh_component.h"      // Para usar Component::Mesh
 
 namespace Engine
 {
@@ -16,15 +19,19 @@ namespace Engine
 
             class RenderSystem : public BaseSystem
             {
+            public:
+                RenderSystem(Engine::Render::Renderer &renderer);
+
+                void update(World &world, float dt) override;
+
             private:
                 Engine::Render::Renderer &m_renderer;
 
-            public:
-                // O construtor AGORA aceita a referência L-VALUE do wrapper
-                RenderSystem(Engine::Render::Renderer &renderer);                 
+                // NOVO: Referência ao AssetManager (Singleton)
+                Engine::Asset::AssetManager &m_assetManager;
 
-                // Remova TODO o corpo {...} daqui. Mantenha apenas a declaração.
-                void update(World &world, float dt) override;
+                // NOVO: Instância do Armature Renderer (movido para private - SRP)
+                Engine::Render::ArmatureRenderer m_armatureRenderer;
             };
 
         } // namespace System
