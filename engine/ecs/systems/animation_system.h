@@ -2,6 +2,7 @@
 #pragma once
 
 #include "base_system.h"
+#include "../../ecs/world.h"
 #include "../../asset/asset_manager.h" // Dependência para buscar dados de animação
 
 // Forward declarations dos Componentes
@@ -27,13 +28,10 @@ namespace Engine
 
             public:
                 // O construtor injeta o AssetManager (DIP)
-                AnimationSystem(Engine::Asset::AssetManager& assetManager);
+                AnimationSystem(Engine::Asset::AssetManager &assetManager);
                 
                 // O update executa a lógica de cálculo de frames e blend.
                 void update(World &world, float dt) override;
-                
-                // Utilitário para converter string de nome da animação em Hash ID
-                uint32_t getAnimationID(const std::string& animationName) const;
             };
 
         } // namespace System

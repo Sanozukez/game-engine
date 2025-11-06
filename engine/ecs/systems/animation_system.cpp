@@ -1,119 +1,151 @@
-// // engine/ecs/systems/animation_system.cpp
+// engine/ecs/systems/animation_system.cpp
+//
+// CORREÇÃO: Usando o mapa 'boneFinalLocalTransforms' (Pose de Descanso + Override de Animação)
+// e passando-o para o SkeletonHierarchy.
 
 #include "animation_system.h"
 #include "../world.h"
 #include "../components/transform_component.h"
 #include "../components/movement_component.h"
 #include "../components/animation_component.h"
-#include "../../asset/animation_utils.h"
+#include "../components/mesh_component.h" // Necessário para a assinatura
+#include "../../asset/skeleton.h"
+#include "../../asset/animation.h"
+#include "../../animation/keyframe_sampler.h"
+#include "../../animation/skeleton_hierarchy.h"
 #include "../../core/log.h"
+#include "../../asset/model.h" // Necessário para getNodeLocalTransform
+
 #include <glm/gtx/norm.hpp>
 #include <format>
-// #include <functional>
+#include <map>
+#include <stdexcept>
+#include <memory>
 
+using namespace Engine::ECS;
 using namespace Engine::ECS::System;
 using namespace Engine::ECS::Component;
 using namespace Engine::Asset;
 
-// Definimos o hash usando o AnimationUtils (que usa std::hash)
-// Isso é necessário porque o AnimationSystem::update não é static.
-const uint32_t ANIM_IDLE = AnimationUtils::getAnimationHashID("idle"); // CORRIGIDO
-const uint32_t ANIM_RUN = AnimationUtils::getAnimationHashID("run");   // CORRIGIDO
-
+// Construtor
 AnimationSystem::AnimationSystem(AssetManager &assetManager)
     : m_assetManager(assetManager)
 {
-    // O construtor é simples, apenas armazena a dependência.
-}
-
-// Implementação simples da função utilitária (para uso futuro)
-uint32_t AnimationSystem::getAnimationID(const std::string &animationName) const
-{
-    // Esta função deve usar o AssetManager::getAssetIDByName(animationName)
-    // para garantir o hash consistente do sistema, usando a instância injetada.
-    return AnimationUtils::getAnimationHashID(animationName);
+    // A assinatura (Signature) é definida no app_setup.cpp
 }
 
 void AnimationSystem::update(World &world, float dt)
 {
-    // Itera sobre todas as Entidades com a assinatura: Transform, Movement, Animation
-    for (const auto &entity : m_entities)
+    // LOG 1: (Mantido)
+    if (m_entities.empty())
     {
-        auto &mv = world.getComponent<Movement>(entity);
-        auto &anim = world.getComponent<Animation>(entity);
+        Engine::Core::Log::Warn("[ANIM_SYSTEM] Nenhuma entidade para processar neste frame. (m_entities vazio)");
+        return;
+    }
 
-        // ----------------------------------------------------------------------
-        // 1. DETERMINAÇÃO DO ESTADO E GATILHO DE INICIALIZAÇÃO
-        // ----------------------------------------------------------------------
+    // LOG 2: (Mantido)
+    Engine::Core::Log::Info(std::format("[ANIM_SYSTEM] Processando {} entidades.", m_entities.size()));
 
-        // GATILHO CRÍTICO: Se a ID atual for 0 (default/não inicializada), force IDLE.
-        if (anim.currentAnimationID == 0)
+    for (const EntityID entityID : m_entities)
+    {
+        Engine::ECS::Component::Animation &animComp = world.getComponent<Engine::ECS::Component::Animation>(entityID);
+        Engine::ECS::Component::Mesh &meshComp = world.getComponent<Engine::ECS::Component::Mesh>(entityID);
+
+        std::shared_ptr<Model> model = m_assetManager.getModel(meshComp.assetID);
+
+        if (!model || !model->hasSkeleton())
         {
-            anim.currentAnimationID = ANIM_IDLE;
-            anim.previousAnimationID = ANIM_IDLE;
-            anim.blendFactor = 1.0f; // Força o estado IDLE a ser 100% visível
+            continue;
         }
 
-        uint32_t desiredAnimID;
-        bool isMoving = (mv.currentVelocity > 0.01f) || mv.isMovingToDestination;
+        Skeleton *skeleton = model->getSkeleton();
+        const Animation *currentAnim = model->getAnimation(animComp.currentAnimationID);
 
-        if (isMoving)
+        if (!skeleton || !currentAnim)
         {
-            desiredAnimID = ANIM_RUN;
-        }
-        else
-        {
-            desiredAnimID = ANIM_IDLE;
+            continue;
         }
 
-        // ----------------------------------------------------------------------
-        // 2. LÓGICA DE TRANSIÇÃO E BLEND
-        // ----------------------------------------------------------------------
-
-        if (desiredAnimID != anim.currentAnimationID)
+        // 1. Atualizar o tempo da animação (Mantido)
+        animComp.currentTime += dt * currentAnim->ticksPerSecond;
+        float duration = currentAnim->duration;
+        if (duration > 0.0f)
         {
-            // Se já não estivermos em transição, configuramos a nova transição:
-            if (anim.blendFactor >= 1.0f)
-            {
-                anim.previousAnimationID = anim.currentAnimationID;
-                anim.currentAnimationID = desiredAnimID;
-                anim.blendFactor = 0.0f; // Inicia a transição
+            animComp.currentTime = std::fmod(animComp.currentTime, duration);
+        }
+
+        // --- CORREÇÃO (Passo 1): Preparar o mapa da Pose Final ---
+
+        // Este é o único mapa que precisamos.
+        std::map<int, glm::mat4> boneFinalLocalTransforms;
+
+        // Primeiro, preenchemos o mapa com a POSE DE DESCANSO (Rest Pose / T-Pose)
+        // que está armazenada na hierarquia de Nós (Nodes) do Modelo.
+        for (const auto &bone : skeleton->bones)
+        {
+            // Obtém a transformação de descanso
+            glm::mat4 restPoseTransform = model->getNodeLocalTransform(bone.name);
+
+            // LOG DE DEPURAÇÃO: Checar o que estamos recebendo
+            if (bone.id == skeleton->rootNodeId)
+            { // Logar apenas o Root para evitar spam
+                Engine::Core::Log::Info(std::format("[ANIM_DEBUG] Rest Pose T (Root): ({:.2f}, {:.2f}, {:.2f})",
+                                                    restPoseTransform[3].x, restPoseTransform[3].y, restPoseTransform[3].z));
             }
+
+            boneFinalLocalTransforms[bone.id] = restPoseTransform;
         }
 
-        // Atualiza o fator de blend
-        if (anim.blendFactor < 1.0f)
+        // --- CORREÇÃO (Passo 2): Aplicar a Animação (Override) ---
+        // Agora, sobrescrevemos a pose de descanso com a pose animada (ex: "idle")
+        for (const auto &pair : currentAnim->channels)
         {
-            anim.blendFactor += anim.blendSpeed * dt;
-            anim.blendFactor = glm::min(anim.blendFactor, 1.0f);
+            const BoneChannel &channel = pair.second;
+
+            if (channel.boneId == -1 ||
+                channel.positionKeys.empty() ||
+                channel.rotationKeys.empty() ||
+                channel.scaleKeys.empty())
+            {
+                continue;
+            }
+
+            Engine::Core::Log::Debug(std::format("[ANIM_DBG] Sampling Bone: {}", channel.boneName));
+
+            size_t indexA, indexB;
+            float progress = KeyframeSampler::findKeyframePairAndGetProgress(
+                channel,
+                animComp.currentTime,
+                indexA,
+                indexB);
+
+            // 2a. Interpolação T, R, S
+            glm::vec3 T = KeyframeSampler::interpolateTranslation(channel, progress, indexA, indexB);
+            glm::quat R = KeyframeSampler::interpolateRotation(channel, progress, indexA, indexB);
+            glm::vec3 S = KeyframeSampler::interpolateScale(channel, progress, indexA, indexB);
+
+            // 2b. Calcular a Matriz Local: T * R * S
+            glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), T);
+            localTransform *= glm::mat4_cast(R);
+            localTransform = glm::scale(localTransform, S);
+
+            // ** A MUDANÇA: Sobrescreve a pose de descanso pela pose animada **
+            boneFinalLocalTransforms[channel.boneId] = localTransform;
         }
 
-        // ----------------------------------------------------------------------
-        // 3. CÁLCULO DE FRAMES (Avance o Tempo e Calcule a Pose)
-        // ----------------------------------------------------------------------
+        // 3. Aplicar Cinemática Forward (Usando o mapa correto)
+        SkeletonHierarchy::traverseAndCalculateFinalTransforms(
+            *skeleton,
+            boneFinalLocalTransforms); // <--- PASSANDO O MAPA CORRETO
 
-        // Atualiza o tempo da animação (simplesmente avança o contador)
-        anim.currentTime += dt;
-
-        // Busca o modelo
-        std::shared_ptr<Model> model = m_assetManager.getModel(anim.animationAssetID);
-
-        if (model)
+        // 4. Debug (Logs mantidos)
+        if (skeleton->rootNodeId != -1)
         {
-            // O Utilitário faz o cálculo complexo
-            AnimationUtils::calculateBoneTransforms(
-                model,
-                anim.currentAnimationID,
-                anim.previousAnimationID,
-                anim.currentTime,
-                anim.blendFactor,
-                anim.finalBoneTransforms);
-        }
-
-        // Por enquanto, garantimos que o vetor de transforms finais está pronto para o Renderer
-        if (anim.finalBoneTransforms.empty())
-        {
-            anim.finalBoneTransforms.resize(Animation::MAX_BONES, glm::mat4(1.0f));
+            const Bone &root = skeleton->bones[skeleton->rootNodeId];
+            Engine::Core::Log::Info(std::format("[ANIM_DEBUG] Root ({}) Final T: ({:.2f}, {:.2f}, {:.2f})",
+                                                root.name, root.finalTransformation[3].x, root.finalTransformation[3].y, root.finalTransformation[3].z));
+            Engine::Core::Log::Info(std::format("[ANIM_DEBUG] Root ({}) IBM T: ({:.2f}, {:.2f}, {:.2f})",
+                                                root.name, root.inverseBindMatrix[3].x, root.inverseBindMatrix[3].y, root.inverseBindMatrix[3].z));
         }
     }
 }

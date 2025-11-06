@@ -23,6 +23,7 @@ add_subdirectory(math) # Requerido por Vec3/Quat
 add_subdirectory(window)
 add_subdirectory(camera)
 add_subdirectory(input)
+add_subdirectory(animation)
 add_subdirectory(render)
 add_subdirectory(geometry)
 add_subdirectory(asset)

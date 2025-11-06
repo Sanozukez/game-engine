@@ -55,7 +55,7 @@ namespace Engine
             cameraRef.applyExternalConfig(config);
 
             // NOVO: Inicializa o Shader Manager antes de tudo
-            Engine::Render::ShaderManager::Get().initialize(config); // <--- AÇÃO CRÍTICA (Linha 46 original)            
+            Engine::Render::ShaderManager::Get().initialize(config); // <--- AÇÃO CRÍTICA (Linha 46 original)
             // ---------------------------------------------------------------------------------
 
             // --- CARREGAR LUZ GLOBAL (CORRIGIDO PARA USO DE JSON SEGURO) ---
@@ -107,7 +107,7 @@ namespace Engine
             world.registerComponent<TerrainTracker>();
             world.registerComponent<CameraTarget>();
             world.registerComponent<CameraInput>();
-            world.registerComponent<Animation>();
+            world.registerComponent<Engine::ECS::Component::Animation>();
             Log::Info("[AppSetup] Todos os Componentes ECS registrados com sucesso.");
 
             // [AppSetup] Lendo configurações do JSON
@@ -163,7 +163,7 @@ namespace Engine
             playerAnimConfig.blendFactor = 1.0f;
             playerAnimConfig.currentTime = 0.0f;
 
-            world.addComponent<Animation>(playerEntity, playerAnimConfig);
+            world.addComponent<Engine::ECS::Component::Animation>(playerEntity, playerAnimConfig);
 
             // Movement Componente (Configurado pelo JSON)
             Component::Movement playerMovementConfig;
@@ -256,10 +256,11 @@ namespace Engine
 
             // --- ANIMATION SYSTEM ---
             ComponentSignature animationSignature;
-            animationSignature.set(typeManager.getTypeID<Transform>());
-            animationSignature.set(typeManager.getTypeID<Movement>());
-            animationSignature.set(typeManager.getTypeID<Animation>());
 
+            animationSignature.set(typeManager.getTypeID<Transform>());
+            animationSignature.set(typeManager.getTypeID<Mesh>()); // <-- ADICIONADO
+            animationSignature.set(typeManager.getTypeID<Movement>());
+            animationSignature.set(typeManager.getTypeID<Engine::ECS::Component::Animation>());
             // Injetamos o AssetManager para que o sistema possa acessar os dados GLTF/Animation
             world.addSystem<AnimationSystem>(assetManager);
             world.registerSystemSignature<AnimationSystem>(animationSignature);

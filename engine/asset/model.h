@@ -1,7 +1,9 @@
 // src/engine/asset/model.h
-// (atualizado — mantém SRP e compat com 3-args)
 
 #pragma once
+
+#include "skeleton.h"  // <-- ADICIONAR
+#include "animation.h" // <-- ADICIONAR
 #include <vector>
 #include <string>
 #include <memory>
@@ -30,33 +32,6 @@ namespace Engine
             glm::vec3 Tangent;
             glm::ivec4 BoneIDs = glm::ivec4(0);
             glm::vec4 Weights = glm::vec4(0.0f);
-        };
-
-        struct BoneInfo
-        {
-            int id;
-            glm::mat4 offset; // inverse bind
-        };
-
-        template <typename T>
-        struct KeyFrame
-        {
-            float time;
-            T value;
-        };
-
-        struct BoneChannel
-        {
-            std::vector<KeyFrame<glm::vec3>> positionKeys;
-            std::vector<KeyFrame<Engine::Math::Quat>> rotationKeys;
-            std::vector<KeyFrame<glm::vec3>> scaleKeys;
-            std::string boneName;
-        };
-
-        struct AnimationClip
-        {
-            std::unordered_map<std::string, BoneChannel> boneChannels;
-            float duration = 0.0f;
         };
 
         struct Node
@@ -120,42 +95,51 @@ namespace Engine
 
             std::unique_ptr<Model> clone() const;
 
-            const std::unordered_map<std::string, BoneInfo> &getBoneInfoMap() const { return m_boneInfoMap; }
-            const std::string &getSkeletonRootName() const { return m_skeletonRootNodeName; }
-            int getBoneCount() const { return m_boneCounter; }
+            const Skeleton *getSkeleton() const { return m_skeleton.get(); }                   // <-- ATUALIZADO
+            Skeleton *getSkeleton() { return m_skeleton.get(); }                               // <-- ATUALIZADO
+            void setSkeleton(std::unique_ptr<Skeleton> skel) { m_skeleton = std::move(skel); } // <-- ATUALIZADO
 
-            void setSkeletonRootName(const std::string &rootName) { m_skeletonRootNodeName = rootName; }
-            void addBone(const std::string &name, const glm::mat4 &offset);
-
-            // NOVO: Adiciona osso forçando o ID igual ao índice do joint do GLTF
-            void addBone(const std::string &name, const glm::mat4 &offset, int forcedId);
+            // NOVO: Métodos de Animação (Animation)
+            void addAnimation(uint32_t nameHash, std::unique_ptr<Animation> anim); // <-- ADICIONAR
+            const Animation *getAnimation(uint32_t nameHash) const;                // <-- ADICIONAR
 
             const std::vector<std::string> getNodeChildren(const std::string &nodeName) const;
             const glm::mat4 getNodeLocalTransform(const std::string &nodeName) const;
-            int getBoneIndexByName(const std::string &boneName) const;
 
-            void addAnimationClip(uint32_t nameHash, AnimationClip clip) { m_animationClips[nameHash] = std::move(clip); }
-            const AnimationClip *getAnimationClip(uint32_t nameHash) const;
+            int getBoneIndexByName(const std::string &boneName) const
+            {
+                if (m_skeleton)
+                {
+                    auto it = m_skeleton->boneNameMap.find(boneName);
+                    if (it != m_skeleton->boneNameMap.end())
+                        return it->second;
+                }
+                return -1;
+            }
 
             void addNode(const Node &node);
             void setNodeGlobalTransform(const std::string &nodeName, const glm::mat4 &transform);
-            std::vector<glm::vec3> getSkeletonDebugLines(const std::vector<glm::mat4> &finalBoneTransforms) const;
+            std::vector<glm::vec3> getSkeletonDebugLines() const;
 
             void setSkeletonBindTransform(const glm::mat4 &m) { m_skeletonBindTransform = m; }
             const glm::mat4 &getSkeletonBindTransform() const { return m_skeletonBindTransform; }
 
+            /**
+             * @brief Verifica se o modelo tem dados de esqueleto.
+             */
+            bool hasSkeleton() const { return m_skeleton != nullptr; }
+
         private:
             std::vector<std::unique_ptr<Mesh>> m_meshes;
 
-            std::unordered_map<std::string, BoneInfo> m_boneInfoMap;
-            std::string m_skeletonRootNodeName;
-            int m_boneCounter = 0;
-
-            std::unordered_map<uint32_t, AnimationClip> m_animationClips;
             std::unordered_map<std::string, glm::mat4> m_nodeGlobalTransforms;
             std::unordered_map<std::string, Node> m_nodeHierarchy;
 
             glm::mat4 m_skeletonBindTransform{1.0f};
+
+            // Membros para Animação e Esqueleto
+            std::unique_ptr<Skeleton> m_skeleton;                                  // <-- CORREÇÃO: Aplicar m_ prefix
+            std::unordered_map<uint32_t, std::unique_ptr<Animation>> m_animations; // <-- CORREÇÃO: Tipo e m_ prefix
         };
 
     }

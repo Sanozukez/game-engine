@@ -1,4 +1,4 @@
-// src/engine/shaders/animated.vert
+// engine/shaders/animated.vert
 // (arquivo inteiro, atualizado com uNode)
 #version 330 core
 layout (location = 0) in vec3 aPos;

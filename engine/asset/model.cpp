@@ -8,6 +8,9 @@
 #include <cstddef> // For offsetof
 #include <format>
 #include <vector>
+#include <glm/gtc/matrix_inverse.hpp> // <-- ADICIONAR (para glm::inverse)
+#include "skeleton.h"                 // <-- ADICIONAR
+#include "animation.h"
 
 using namespace Engine::ECS::Component;
 
@@ -16,38 +19,29 @@ namespace Engine
     namespace Asset
     {
         // --- Mesh Class ---
-        Mesh::Mesh(std::vector<Vertex>&& vertices,
-           std::vector<uint32_t>&& indices,
-           std::unique_ptr<Render::Material> material,
-           const glm::mat4& nodeTransform)
-: m_vertices(std::move(vertices))
-, m_indices(std::move(indices))
-, m_material(std::move(material))
-, m_nodeTransform(nodeTransform)
-{
-    setupMesh();
-}
+        Mesh::Mesh(std::vector<Vertex> &&vertices,
+                   std::vector<uint32_t> &&indices,
+                   std::unique_ptr<Render::Material> material,
+                   const glm::mat4 &nodeTransform)
+            : m_vertices(std::move(vertices)), m_indices(std::move(indices)), m_material(std::move(material)), m_nodeTransform(nodeTransform)
+        {
+            setupMesh();
+        }
 
-// Construtor “antigo” (compat) → node = Identity
-Mesh::Mesh(std::vector<Vertex>&& vertices,
-           std::vector<uint32_t>&& indices,
-           std::unique_ptr<Render::Material> material)
-: m_vertices(std::move(vertices))
-, m_indices(std::move(indices))
-, m_material(std::move(material))
-, m_nodeTransform(1.0f)
-{
-    setupMesh();
-}
+        // Construtor “antigo” (compat) → node = Identity
+        Mesh::Mesh(std::vector<Vertex> &&vertices,
+                   std::vector<uint32_t> &&indices,
+                   std::unique_ptr<Render::Material> material)
+            : m_vertices(std::move(vertices)), m_indices(std::move(indices)), m_material(std::move(material)), m_nodeTransform(1.0f)
+        {
+            setupMesh();
+        }
 
-Mesh::Mesh(const Mesh& other)
-: m_vertices(other.m_vertices)
-, m_indices(other.m_indices)
-, m_material(other.m_material ? other.m_material->clone() : nullptr)
-, m_nodeTransform(other.m_nodeTransform)
-{
-    setupMesh();
-}
+        Mesh::Mesh(const Mesh &other)
+            : m_vertices(other.m_vertices), m_indices(other.m_indices), m_material(other.m_material ? other.m_material->clone() : nullptr), m_nodeTransform(other.m_nodeTransform)
+        {
+            setupMesh();
+        }
 
         Mesh::~Mesh()
         {
@@ -59,8 +53,6 @@ Mesh::Mesh(const Mesh& other)
             }
             Engine::Core::Log::Trace("Mesh: Destructor called. OpenGL resources released.");
         }
-
-       
 
         void Mesh::setupMesh()
         {
@@ -151,49 +143,9 @@ Mesh::Mesh(const Mesh& other)
         // MÉTODOS DE SKELETON
         // -------------------------------------------------------------
 
-        void Model::addBone(const std::string &name, const glm::mat4 &offset)
-        {
-            // O Model armazena os dados, o GLTFLoader é quem preenche.
-            // Garante que o osso não seja adicionado duas vezes.
-            if (m_boneInfoMap.find(name) == m_boneInfoMap.end())
-            {
-                BoneInfo info;
-                info.id = m_boneCounter;
-                info.offset = offset;
-                m_boneInfoMap[name] = info;
-                m_boneCounter++;
-            }
-        }
-
-        void Model::addBone(const std::string &name, const glm::mat4 &offset, int forcedId)
-        {
-            // Nova versão: força o ID igual ao índice do joint do GLTF
-            if (m_boneInfoMap.find(name) == m_boneInfoMap.end())
-            {
-                BoneInfo info;
-                info.id = forcedId;
-                info.offset = offset;
-                m_boneInfoMap[name] = info;
-
-                // Garante que o contador nunca fique menor que o maior ID já adicionado
-                m_boneCounter = std::max(m_boneCounter, forcedId + 1);
-            }
-        }
-
         void Model::addNode(const Node &node)
         {
             m_nodeHierarchy[node.name] = node;
-        }
-
-        // NOVO : Shell de getBoneIndexByName
-        int Model::getBoneIndexByName(const std::string &boneName) const
-        {
-            auto it = m_boneInfoMap.find(boneName);
-            if (it != m_boneInfoMap.end())
-            {
-                return it->second.id;
-            }
-            return -1;
         }
 
         // NOVO: Shell de getNodeChildren
@@ -217,16 +169,15 @@ Mesh::Mesh(const Mesh& other)
             return glm::mat4(1.0f);
         }
 
-        // A implementação de getSkeletonRootName() e getBoneInfoMap() são inline (no .h),
-        // então elas não precisam ser definidas aqui.
-
-        const AnimationClip *Model::getAnimationClip(uint32_t nameHash) const
+        void Model::addAnimation(uint32_t nameHash, std::unique_ptr<Animation> anim)
         {
-            if (m_animationClips.count(nameHash))
-            {
-                return &m_animationClips.at(nameHash);
-            }
-            return nullptr;
+            m_animations[nameHash] = std::move(anim);
+        }
+
+        const Animation *Model::getAnimation(uint32_t nameHash) const
+        {
+            auto it = m_animations.find(nameHash); // <-- CORRIGIDO
+            return (it != m_animations.end()) ? it->second.get() : nullptr;
         }
 
         void Model::draw(Engine::Render::Shader &shader, const std::vector<glm::mat4> *boneTransforms)
@@ -235,7 +186,7 @@ Mesh::Mesh(const Mesh& other)
             if (boneTransforms != nullptr)
             {
                 // Certifique-se de que o MAX_BONES está visível. Usamos a constante do Componente.
-                for (size_t i = 0; i < boneTransforms->size() && i < Animation::MAX_BONES; ++i)
+                for (size_t i = 0; i < boneTransforms->size() && i < Skeleton::MAX_BONES; ++i)
                 {
                     std::string uniformName = "uBoneTransforms[" + std::to_string(i) + "]";
                     shader.setMat4(uniformName, boneTransforms->at(i));
@@ -282,42 +233,47 @@ Mesh::Mesh(const Mesh& other)
             m_nodeGlobalTransforms[nodeName] = transform;
         }
 
-        // NOVO: Implementação da função que extrai a geometria das linhas do esqueleto.
-        // A posição de cada bone é a translação final (matriz[3]).
-        std::vector<glm::vec3> Model::getSkeletonDebugLines(const std::vector<glm::mat4> &finalBoneTransforms) const
+        // IMPLEMENTAÇÃO DE getSkeletonDebugLines (Nova assinatura e lógica)
+        std::vector<glm::vec3> Model::getSkeletonDebugLines() const
         {
+            // A lógica assume que 'finalTransformation' no Skeleton foi atualizada pelo AnimationSystem.
             std::vector<glm::vec3> lines;
-
-            // ATENÇÃO: Itera sobre a HIERARQUIA, não sobre o m_nodeGlobalTransforms diretamente.
-            for (const auto &pair : m_nodeHierarchy)
+            if (!m_skeleton || m_skeleton->bones.empty())
             {
-                const Node &node = pair.second;
-
-                // 1. Tenta obter a matriz Global do nó (matriz de posição animada)
-                if (m_nodeGlobalTransforms.count(node.name))
-                { // Verifica se este nó tem uma Global Transform animada
-
-                    glm::mat4 currentBoneGlobal = m_nodeGlobalTransforms.at(node.name);
-                    glm::vec3 currentPos = glm::vec3(currentBoneGlobal[3]);
-
-                    // 2. Itera sobre os filhos
-                    for (const auto &childName : node.childrenNames)
-                    {
-
-                        // Pega a posição do filho APENAS se ele também tem uma matriz Global armazenada.
-                        if (m_nodeGlobalTransforms.count(childName))
-                        {
-
-                            glm::mat4 childBoneGlobal = m_nodeGlobalTransforms.at(childName);
-                            glm::vec3 childPos = glm::vec3(childBoneGlobal[3]);
-
-                            // Adiciona as coordenadas (Ponto A e Ponto B)
-                            lines.push_back(currentPos); // Ponto A (Pai)
-                            lines.push_back(childPos);   // Ponto B (Filho)
-                        }
-                    }
-                }
+                return lines;
             }
+
+            // O cálculo é: MatrizGlobal = MatrizFinal * (IBM^-1)
+
+            for (const auto &bone : m_skeleton->bones)
+            {
+                // Se o bone não tem pai, é o root. Pulamos para desenhar apenas as conexões.
+                if (bone.parentId == -1 || bone.parentId >= m_skeleton->bones.size())
+                {
+                    continue;
+                }
+
+                const Bone &parentBone = m_skeleton->bones[bone.parentId];
+
+                // 1. Matriz Global do Bone
+                // Para debug, usamos a inversa da IBM, que é a matriz de pose de bind (BindPoseMatrix).
+                // MatrizGlobal = MatrizFinal * Inv(IBM)
+                glm::mat4 boneBindInverse = glm::inverse(bone.inverseBindMatrix);
+                glm::mat4 boneGlobal = bone.finalTransformation * boneBindInverse;
+
+                // 2. Matriz Global do Pai
+                glm::mat4 parentBindInverse = glm::inverse(parentBone.inverseBindMatrix);
+                glm::mat4 parentGlobal = parentBone.finalTransformation * parentBindInverse;
+
+                // 3. Posições (O vetor de translação na coluna 4, índice 3)
+                glm::vec3 bonePosition = glm::vec3(boneGlobal[3]);
+                glm::vec3 parentPosition = glm::vec3(parentGlobal[3]);
+
+                // 4. Adicionar a linha (Ponto A e Ponto B)
+                lines.push_back(parentPosition);
+                lines.push_back(bonePosition);
+            }
+
             return lines;
         }
 

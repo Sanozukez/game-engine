@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include "../../asset/animation.h"
 #include <vector>
 #include <cstdint>
 #include <string> // Para o nome da animação (debug/editor)

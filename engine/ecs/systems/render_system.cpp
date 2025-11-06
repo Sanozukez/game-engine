@@ -1,4 +1,6 @@
-// // engine/ecs/systems/render_system.cpp (Implementação CORRIGIDA)
+// engine/ecs/systems/render_system.cpp
+//
+// Implementação CORRIGIDA, usando o Model::Skeleton para extrair as matrizes.
 
 #include "render_system.h"
 #include "../../ecs/world.h"
@@ -8,11 +10,12 @@
 #include "../components/mesh_component.h" // Necessário para Component::Mesh
 #include "../../asset/model.h"            // Necessário para Engine::Asset::Model
 #include "../../math/transform_utils.h"
+#include "../../asset/skeleton.h" // Necessário para Engine::Asset::Skeleton
 
 #include <glm/glm.hpp>
 #include <memory>
 #include <format>
-// NOTA: Os 'using namespace' foram evitados para resolver o conflito 'Mesh'
+#include <vector> // Necessário para std::vector<glm::mat4>
 
 using namespace Engine::ECS;
 using namespace Engine::ECS::Component;
@@ -31,9 +34,10 @@ RenderSystem::RenderSystem(Engine::Render::Renderer &renderer)
 // Implementação da Lógica de Update
 void RenderSystem::update(World &world, float dt)
 {
-    // Obtém as matrizes de View e Projection (CORREÇÃO C2039: usando getCamera())
+    // Obtém as matrizes de View e Projection
     glm::mat4 viewMatrix = m_renderer.getCamera().getViewMatrix();
     glm::mat4 projectionMatrix = m_renderer.getCamera().getProjectionMatrix();
+    // NOTA: A matriz ViewProjection é calculada no renderer ou camera, mas passamos view/proj separadas para o armature.
 
     // 1. Inicia o frame (chamada de baixo nível)
     m_renderer.beginScene();
@@ -43,53 +47,62 @@ void RenderSystem::update(World &world, float dt)
     {
         // 3. Obtém os componentes necessários
         Transform &transform = world.getComponent<Transform>(entityID);
-
-        // CORREÇÃO C2872: Usar o namespace completo, apesar do 'using namespace Component' acima.
-        // O compilador ainda pode se confundir com 'Asset::Mesh'.
         Engine::ECS::Component::Mesh &mesh = world.getComponent<Engine::ECS::Component::Mesh>(entityID);
 
-        // --- VERIFICAÇÃO DE ANIMAÇÃO (Lógica opcional) ---
-        const std::vector<glm::mat4> *boneTransforms = nullptr;
+        // --- PREPARAÇÃO DE ANIMAÇÃO (Correção C2039) ---
+        std::vector<glm::mat4> finalBoneTransforms; // Vetor local para as matrizes
+        const std::vector<glm::mat4> *boneTransformsPtr = nullptr;
 
-        if (world.hasComponent<Animation>(entityID))
+        // Obter o modelo associado ao MeshComponent
+        std::shared_ptr<Engine::Asset::Model> model = m_assetManager.getModel(mesh.assetID);
+
+        // Se tiver Animation Component e o Modelo tiver um Skeleton, extrair as transforms.
+        if (model && model->hasSkeleton() && world.hasComponent<Animation>(entityID))
         {
-            auto &anim = world.getComponent<Animation>(entityID);
-
-            if (!anim.finalBoneTransforms.empty())
+            Skeleton *skeleton = model->getSkeleton();
+            if (skeleton)
             {
-                boneTransforms = &anim.finalBoneTransforms;
+                // Usa o novo método do Skeleton (adicionado na última etapa) para extrair os resultados.
+                // Isso funciona porque o AnimationSystem já atualizou o 'finalTransformation' do Skeleton.
+                skeleton->getFinalBoneTransforms(finalBoneTransforms);
+
+                if (!finalBoneTransforms.empty())
+                {
+                    boneTransformsPtr = &finalBoneTransforms;
+                }
             }
         }
         // -----------------------------------------------------
 
         // 4. DESENHA A MALHA
-        m_renderer.submit(mesh.assetID, transform, boneTransforms);
+        m_renderer.submit(mesh.assetID, transform, boneTransformsPtr);
 
         // **********************************************
         // 5. DEBUG: VISUALIZAÇÃO DO ESQUELETO
         // **********************************************
-       if (boneTransforms != nullptr)
+        // Assumindo que a flag de debug deve estar aqui (ex: m_debugArmature, se fosse um membro)
+        if (boneTransformsPtr != nullptr && model && model->hasSkeleton())
         {
-            // Pega o Modelo do Cache
-            std::shared_ptr<Engine::Asset::Model> model = m_assetManager.getModel(mesh.assetID);
+            // 3.1. Extrai as linhas de debug
+            // CORREÇÃO C2660: Função não recebe mais o argumento *boneTransforms.
+            Engine::Core::Log::Info("[RENDER_DEBUG] Tentando gerar linhas de debug do esqueleto."); // <-- ADICIONAR ESTE LOG
+            std::vector<glm::vec3> debugLines = model->getSkeletonDebugLines();                     // <-- CORRIGIDO
 
-            if (model)
+            if (!debugLines.empty())
             {
-                // 3.1. Extrai as linhas de debug
-                std::vector<glm::vec3> debugLines = model->getSkeletonDebugLines(*boneTransforms);
+                Engine::Core::Log::Info(std::format("[RENDER_DEBUG] Geradas {} linhas de debug. Desenhando.", debugLines.size()));
+                // 3.2. Obtém o shader de Armature
+                Shader &armatureShader = ShaderManager::Get().getShader(m_assetManager.getAssetIDByName("armature"));
 
-                if (!debugLines.empty())
-                {
-                    // 3.2. Obtém o shader de Armature 
-                    Shader& armatureShader = ShaderManager::Get().getShader(m_assetManager.getAssetIDByName("armature")); 
-                    
-                    // NOVO: Calcula a Model Matrix do personagem
-                    glm::mat4 modelMatrix = Engine::Math::getTransformMatrix(transform); // Reutiliza a função do renderer
+                // NOVO: Calcula a Model Matrix do personagem
+                glm::mat4 modelMatrix = Engine::Math::getTransformMatrix(transform);
 
-                    // 3.3. Desenha o esqueleto
-                    // A matriz do modelo da entidade é passada para posicionar o esqueleto no mundo.
-                    m_armatureRenderer.draw(armatureShader, debugLines, viewMatrix, projectionMatrix, modelMatrix); // <-- NOVO ARGUMENTO
-                }
+                // 3.3. Desenha o esqueleto
+                m_armatureRenderer.draw(armatureShader, debugLines, viewMatrix, projectionMatrix, modelMatrix);
+            }
+            else
+            {
+                Engine::Core::Log::Warn("[RENDER_DEBUG] getSkeletonDebugLines retornou vetor vazio."); // <-- ADICIONAR ESTE LOG
             }
         }
     }
