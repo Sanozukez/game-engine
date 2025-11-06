@@ -7,6 +7,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include "./../../engine/core/log.h"
 
 namespace Engine
 {
@@ -27,6 +28,12 @@ namespace Engine
 
         // Matriz de Transformação Final (calculada a cada frame)
         glm::mat4 finalTransformation = glm::mat4(1.0f);
+
+        // --- CORREÇÃO ---
+        // Matriz Global (calculada a cada frame para debug/física)
+        // Esta é a globalTransform (Parent * Local) ANTES da multiplicação pela IBM.
+        glm::mat4 debug_GlobalTransform = glm::mat4(1.0f);
+        // --- FIM DA CORREÇÃO ---
     };
 
     /**
@@ -59,6 +66,16 @@ namespace Engine
          */
         void getFinalBoneTransforms(std::vector<glm::mat4> &outTransforms) const
         {
+            // --- NOVO LOG DE DEBUG ---
+            if (bones.empty())
+            {
+                Engine::Core::Log::Error("[DEBUG_SKEL] getFinalBoneTransforms: 'skeleton->bones' ESTÁ VAZIO. Retornando vetor vazio.");
+            }
+            else
+            {
+                Engine::Core::Log::Info(std::format("[DEBUG_SKEL] getFinalBoneTransforms: 'skeleton->bones' tem {} ossos. Retornando matrizes.", bones.size()));
+            }
+            // --- FIM DO LOG ---
             outTransforms.clear();
             outTransforms.reserve(bones.size());
             for (const auto &bone : bones)

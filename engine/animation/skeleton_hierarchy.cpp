@@ -25,19 +25,19 @@ namespace Engine {
     
     // Esta é a definição do método estático público da classe SkeletonHierarchy
     void SkeletonHierarchy::traverseAndCalculateFinalTransforms(
-        Engine::Skeleton& skeleton, // Usando o tipo Engine::Skeleton
-        const std::map<int, glm::mat4>& currentBoneTransformations
+        Engine::Skeleton& skeleton, 
+        const std::map<int, glm::mat4>& currentBoneTransformations,
+        const glm::mat4& rootTransform // <-- NOVO ARGUMENTO
     ) {
         // 1. Verificação de segurança no nó raiz
         if (skeleton.rootNodeId != -1 && skeleton.rootNodeId < (int)skeleton.bones.size()) {
-            const glm::mat4 identityMatrix = glm::mat4(1.0f);
-            
+                       
             // Chama o helper 'static private' da PRÓPRIA CLASSE
             calculateBoneGlobalTransform(
                 skeleton, 
                 skeleton.rootNodeId, 
                 currentBoneTransformations, 
-                identityMatrix
+                rootTransform // <-- Passa a matriz correta
             );
         } else {
             Core::Log::Warn(std::format("[HIERARCHY_FAIL] Root Node ID ({}) é inválido ou não setado. Max bones: {}.",
@@ -82,7 +82,12 @@ namespace Engine {
         // 4. Calcula a Matriz Final para o Shader: Global * IBM
         currentBone.finalTransformation = globalTransform * currentBone.inverseBindMatrix;
 
-        // 5. Propaga recursivamente
+        // --- CORREÇÃO ---
+        // 5. Salva a Matriz Global (antes da IBM) para Debug
+        currentBone.debug_GlobalTransform = globalTransform;
+        // --- FIM DA CORREÇÃO ---
+
+        // 6. Propaga recursivamente
         for (int childId : currentBone.childrenIds) {
             calculateBoneGlobalTransform(skeleton, childId, currentBoneTransformations, globalTransform);
         }

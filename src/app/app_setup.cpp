@@ -107,19 +107,17 @@ namespace Engine
             world.registerComponent<TerrainTracker>();
             world.registerComponent<CameraTarget>();
             world.registerComponent<CameraInput>();
-            world.registerComponent<Engine::ECS::Component::Animation>();
+            world.registerComponent<Engine::ECS::Component::AnimationComponent>();
             Log::Info("[AppSetup] Todos os Componentes ECS registrados com sucesso.");
 
             // [AppSetup] Lendo configurações do JSON
             auto &config = ConfigManager::Get();
-            auto &assetManager = Engine::Asset::AssetManager::Get(); // Acesso ao AssetManager
+            // Acesso ao AssetManager
+            auto &assetManager = Engine::Asset::AssetManager::Get();
 
             // --------------------------------------------------------------------------------
             // 1. OBTENDO CONFIGURAÇÕES DO JSON (Usando as variáveis já declaradas no topo)
             // --------------------------------------------------------------------------------
-            // config e assetManager foram lidos no topo, usaremos as variáveis
-            // que estão no escopo (linhas 106-114 do seu código)
-
             std::string playerModelName = config.getValue<std::string>("character.player.model_name", "character_test.glb");
             glm::vec3 startPos = config.getValue<glm::vec3>("character.player.start_position", glm::vec3(0.0f, 50.0f, 0.0f));
             const uint32_t playerAssetID = assetManager.getAssetIDByName(playerModelName);
@@ -152,7 +150,7 @@ namespace Engine
             world.addComponent<Player>(playerEntity, playerConfig);
 
             // Inicializa o asset de animação com o mesmo assetID da Mesh.
-            Component::Animation playerAnimConfig;
+            Component::AnimationComponent playerAnimConfig;
             playerAnimConfig.animationAssetID = playerAssetID;
 
             // GATILHO CRÍTICO: Inicia a animação IDLE
@@ -163,7 +161,7 @@ namespace Engine
             playerAnimConfig.blendFactor = 1.0f;
             playerAnimConfig.currentTime = 0.0f;
 
-            world.addComponent<Engine::ECS::Component::Animation>(playerEntity, playerAnimConfig);
+            world.addComponent<Engine::ECS::Component::AnimationComponent>(playerEntity, playerAnimConfig);
 
             // Movement Componente (Configurado pelo JSON)
             Component::Movement playerMovementConfig;
@@ -217,6 +215,17 @@ namespace Engine
             world.registerSystemSignature<Engine::ECS::System::CameraInputSystem>(ComponentSignature());
 
             // 2. REGISTRO DOS OUTROS SYSTEMS
+
+            // --- ANIMATION SYSTEM ---
+            
+            ComponentSignature animationSignature;
+            animationSignature.set(typeManager.getTypeID<Transform>());
+            animationSignature.set(typeManager.getTypeID<Mesh>());
+            animationSignature.set(typeManager.getTypeID<Movement>());
+            animationSignature.set(typeManager.getTypeID<Engine::ECS::Component::AnimationComponent>());
+            world.addSystem<AnimationSystem>(assetManager);
+            world.registerSystemSignature<AnimationSystem>(animationSignature);
+            
             // -- RENDER SYSTEM --
             ComponentSignature renderSignature;
             renderSignature.set(typeManager.getTypeID<Transform>());
@@ -254,16 +263,7 @@ namespace Engine
                 terrainSystem->update(world, 0.0f);
             }
 
-            // --- ANIMATION SYSTEM ---
-            ComponentSignature animationSignature;
-
-            animationSignature.set(typeManager.getTypeID<Transform>());
-            animationSignature.set(typeManager.getTypeID<Mesh>()); // <-- ADICIONADO
-            animationSignature.set(typeManager.getTypeID<Movement>());
-            animationSignature.set(typeManager.getTypeID<Engine::ECS::Component::Animation>());
-            // Injetamos o AssetManager para que o sistema possa acessar os dados GLTF/Animation
-            world.addSystem<AnimationSystem>(assetManager);
-            world.registerSystemSignature<AnimationSystem>(animationSignature);
+            
 
             // 2. APLICAÇÃO DE YAW E TARGET (Configuração da Câmera)
             Component::Transform &currentTransform = world.getComponent<Component::Transform>(playerEntity);

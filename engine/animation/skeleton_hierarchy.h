@@ -21,7 +21,8 @@ namespace Engine {
          */
         static void traverseAndCalculateFinalTransforms(
             Skeleton& skeleton,
-            const std::map<int, glm::mat4>& currentBoneTransformations
+            const std::map<int, glm::mat4>& currentBoneTransformations,
+            const glm::mat4& rootTransform // <-- NOVO ARGUMENTO
         );
 
     private:

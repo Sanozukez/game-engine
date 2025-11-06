@@ -61,8 +61,18 @@ void ArmatureRenderer::draw(const Shader& shader,
                           const glm::mat4& modelMatrix) const // <-- NOVO ARGUMENTO
 {
     if (debugLines.empty()) {
+        // --- NOVO LOG DE DEBUG ---
+        // Se vermos este log, significa que o RenderSystem chamou o draw,
+        // mas o Model::getSkeletonDebugLines falhou em gerar as linhas.
+        Engine::Core::Log::Warn("[DEBUG_RENDER] ArmatureRenderer::draw foi chamado, mas debugLines estava vazio. Nada para desenhar.");
+        // --- FIM DO LOG ---
         return;
     }
+    // --- NOVO LOG DE DEBUG ---
+    // Se vermos este log, TUDO está funcionando e o bug é
+    // visual (ex: matriz modelMatrix errada).
+    Engine::Core::Log::Info(std::format("[DEBUG_RENDER] ArmatureRenderer::draw: Desenhando {} linhas.", debugLines.size() / 2));
+    // --- FIM DO LOG ---
 
     // 1. Atualiza e Binda os buffers
     updateBuffers(debugLines);

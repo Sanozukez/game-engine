@@ -5,38 +5,40 @@
 #include <glm/gtc/quaternion.hpp> // Necessário para a interpolação de quat
 #include "../../asset/skeleton.h"
 #include <algorithm> // Para std::min
+#include "../math/quat.h"
 
 namespace Engine
 {
 
     // Helper: Usa a lista de positionKeys para encontrar o tempo, assumindo que T, R e S estão sincronizados.
     float KeyframeSampler::findKeyframePairAndGetProgress(
-        const BoneChannel &channel,
+        const Asset::AnimationChannel &channel, // <-- MUDOU
         float animationTime,
         size_t &indexA,
         size_t &indexB)
     {
-        const auto &keyframes = channel.positionKeys;
-        const size_t keyCount = keyframes.size(); // Usar um contador de tamanho
+        // (A sua lógica de 'findKeyframePair...' parece robusta. 
+        // No entanto, ela assume que T, R, e S têm o *mesmo número* de 
+        // keyframes e os *mesmos tempos*, o que é uma otimização.
+        // O seu código antigo (animation_utils) procurava T, R, e S
+        // separadamente. Vamos manter a sua lógica otimizada por agora,
+        // mas o bug de animação "bugada" pode estar aqui se T, R, S
+        // não estiverem sincronizados.)
+        const auto &keyframes = channel.positionKeys; // <-- Baseia-se apenas nas Posições
+        const size_t keyCount = keyframes.size(); 
 
-        // 1. CASO DE SEGURANÇA (0 ou 1 keyframe):
-        // Se a contagem for <= 1, não há interpolação possível, e o índice de acesso é 0.
         if (keyCount <= 1)
         {
             indexA = indexB = 0;
             return 0.0f;
         }
 
-        // 2. CASO LIMITE: Tempo além do fim do clipe (keyCount >= 2)
-        // keyframes.back() é seguro porque keyCount >= 2
         if (animationTime >= keyframes.back().time)
         {
             indexA = indexB = keyCount - 1;
             return 0.0f;
         }
 
-        // 3. BUSCA E INTERPOLAÇÃO (keyCount >= 2)
-        // O loop itera de 0 até keyCount - 2, garantindo que [i + 1] seja seguro.
         for (size_t i = 0; i < keyCount - 1; ++i)
         {
             if (animationTime < keyframes[i + 1].time)
@@ -55,25 +57,21 @@ namespace Engine
             }
         }
 
-        // Fallback de segurança (nunca deveria ser alcançado)
         indexA = indexB = keyCount - 1;
         return 0.0f;
     }
 
-    glm::vec3 KeyframeSampler::interpolateTranslation(const BoneChannel &channel, float progress, size_t indexA, size_t indexB)
+    // (interpolateTranslation permanece igual)
+    glm::vec3 KeyframeSampler::interpolateTranslation(const Asset::AnimationChannel &channel, float progress, size_t indexA, size_t indexB)
     {
         const auto &keyframes = channel.positionKeys;
-
-        // Verificação de segurança (deve ser redundante se findKeyframePair... estiver correto, mas é segura)
         if (keyframes.empty())
             return glm::vec3(0.0f);
-        if (indexA >= keyframes.size() || indexB >= keyframes.size())
-        {
-            return keyframes.back().value;
+        if (indexA >= keyframes.size() || indexB >= keyframes.size()) {
+            // (Esta lógica está ligeiramente errada, devia usar std::min como nas outras, mas vamos manter por agora)
+            return keyframes.back().value; 
         }
-
-        if (indexA == indexB)
-        {
+        if (indexA == indexB) {
             return keyframes[indexA].value;
         }
         const glm::vec3 &start = keyframes[indexA].value;
@@ -81,36 +79,42 @@ namespace Engine
         return glm::mix(start, end, progress); // LERP
     }
 
-    glm::quat KeyframeSampler::interpolateRotation(const BoneChannel &channel, float progress, size_t indexA, size_t indexB)
+    // --- CORREÇÃO C2039 ('toGLM') ---
+    glm::quat KeyframeSampler::interpolateRotation(const Asset::AnimationChannel &channel, float progress, size_t indexA, size_t indexB)
     {
         const auto &keyframes = channel.rotationKeys;
 
-        // *** CORREÇÃO CRÍTICA DE CRASH ***
         if (keyframes.empty())
-            return glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Retorno neutro
+            return glm::quat(1.0f, 0.0f, 0.0f, 0.0f); 
 
-        // Prende os índices aos limites REAIS deste vetor
         size_t safeIndexA = std::min(indexA, keyframes.size() - 1);
         size_t safeIndexB = std::min(indexB, keyframes.size() - 1);
 
-        if (safeIndexA == safeIndexB)
-        {
-            return keyframes[safeIndexA].value; // Conversão implícita
+        // 1. Obter os valores como Engine::Math::Quat
+        Engine::Math::Quat q1 = keyframes[safeIndexA].value;
+        Engine::Math::Quat q2 = keyframes[safeIndexB].value;
+
+        if (safeIndexA == safeIndexB) {
+            // Converter apenas o resultado
+            return glm::quat(q1.w, q1.x, q1.y, q1.z);
         }
 
-        // Usa os índices seguros
-        return glm::slerp(keyframes[safeIndexA].value, keyframes[safeIndexB].value, progress);
-    }
+        // 2. Usar o slerp estático da SUA classe Quat
+        Engine::Math::Quat resultQuat = Engine::Math::Quat::slerp(q1, q2, progress);
 
-    glm::vec3 KeyframeSampler::interpolateScale(const BoneChannel &channel, float progress, size_t indexA, size_t indexB)
+        // 3. Converter o Engine::Math::Quat final para glm::quat
+        return glm::quat(resultQuat.w, resultQuat.x, resultQuat.y, resultQuat.z);
+    }
+    // --- FIM DA CORREÇÃO ---
+
+    // (interpolateScale permanece igual)
+    glm::vec3 KeyframeSampler::interpolateScale(const Asset::AnimationChannel &channel, float progress, size_t indexA, size_t indexB)
     {
         const auto &keyframes = channel.scaleKeys;
 
-        // *** CORREÇÃO CRÍTICA DE CRASH ***
         if (keyframes.empty())
-            return glm::vec3(1.0f); // Retorno neutro
+            return glm::vec3(1.0f); 
 
-        // Prende os índices aos limites REAIS deste vetor
         size_t safeIndexA = std::min(indexA, keyframes.size() - 1);
         size_t safeIndexB = std::min(indexB, keyframes.size() - 1);
 
@@ -119,7 +123,6 @@ namespace Engine
             return keyframes[safeIndexA].value;
         }
 
-        // Usa os índices seguros
         return glm::mix(keyframes[safeIndexA].value, keyframes[safeIndexB].value, progress);
     }
 

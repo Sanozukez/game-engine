@@ -188,7 +188,7 @@ namespace Engine
                     std::terminate();
                 }
             }
-
+            
             // 4. REMOVER COMPONENTES (Novo, mas fundamental para a integridade do ECS)
             template <typename T>
             void removeComponent(EntityID entityID)
