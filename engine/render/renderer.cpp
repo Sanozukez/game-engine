@@ -24,20 +24,10 @@ namespace Engine
         Renderer::Renderer(const Window &window, Camera::ICamera &camera)
             : m_window(window), m_camera(camera)
         {
-            // NOVO: A inicialização do ShaderManager é movida para o AppSetup
-            // O Renderer agora só acessa o shader via manager (SRP)
 
-            // REMOVA: std::string vs_path = Engine::resolveEnginePath("engine/shaders/basic.vert").string();
-            // REMOVA: std::string fs_path = Engine::resolveEnginePath("engine/shaders/basic.frag").string();
-            // REMOVA: m_defaultShader = std::make_unique<Shader>(vs_path.c_str(), fs_path.c_str());
-
-            // Engine::Core::Log::Info(std::format("Renderer: Construtor chamado. Shader PBR 'basic' inicializado."));
             Engine::Core::Log::Info("Renderer: Construtor chamado. Shaders gerenciados por ShaderManager.");
-
-            // O m_defaultShader não é mais necessário se você usar o manager
         }
 
-        // --- IMPLEMENTAÇÃO DOS NOVOS SETTERS DE LUZ (SOLUÇÃO C2039) ---
 
         void Renderer::setGlobalLightPos(const glm::vec3 &pos)
         {

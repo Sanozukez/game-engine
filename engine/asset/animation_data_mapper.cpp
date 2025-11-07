@@ -296,7 +296,7 @@ std::vector<std::unique_ptr<Engine::Asset::AnimationAsset>> Engine::AnimationDat
             }
             
             // (Log [DEBUG_MAP] SUCESSO... vai aqui)
-             Core::Log::Info(std::format("[DEBUG_MAP] SUCESSO: Canal para '{}' (ID: {}) encontrado. Carregando keyframes...", boneName, boneIt->second));
+            // Core::Log::Info(std::format("[DEBUG_MAP] SUCESSO: Canal para '{}' (ID: {}) encontrado. Carregando keyframes...", boneName, boneIt->second));
 
             Engine::Asset::AnimationChannel &boneChannel = clip->channels[boneName]; // <-- CORREÇÃO
             boneChannel.boneName = boneName;

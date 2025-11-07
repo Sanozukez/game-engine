@@ -34,9 +34,18 @@ void main()
         skin += aWeights.z * uBoneTransforms[aBoneIDs.z];
         skin += aWeights.w * uBoneTransforms[aBoneIDs.w];
     }
-
-    // A matriz da malha é uModel * uNode (instância * nó da cena)
-    mat4 M = uModel * uNode * skin;
+    
+   mat4 M;
+    if (uIsAnimated) { 
+        // Se for animado, 'skin' (uBoneTransforms) já contém
+        // a transformação completa relativa ao uModel.
+        // O uNode (transform do nó da mesh no glTF) NÃO deve ser usado.     
+        M = uModel * skin;        
+    } else {
+        // Se NÃO for animado (malha estática), aplicamos o uNode.
+        // 'skin' é mat4(1.0) neste caso (definido acima).
+        M = uModel * uNode * skin; 
+    }
 
     vec4 worldPos = M * vec4(aPos, 1.0);
     FragPos = worldPos.xyz;

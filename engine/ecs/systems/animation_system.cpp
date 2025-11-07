@@ -68,10 +68,9 @@ void AnimationSystem::update(World &world, float dt)
         std::shared_ptr<Engine::Asset::Model> model = m_assetManager.getModel(meshComp.assetID);
 
         // (Log [DEBUG_PTR])
-        Engine::Core::Log::Error(std::format("[DEBUG_PTR] AnimationSystem: Entidade {} usa Model@0x{:X}", 
-            static_cast<uint32_t>(entityID), 
-            reinterpret_cast<uintptr_t>(model.get())
-        ));
+        Engine::Core::Log::Error(std::format("[DEBUG_PTR] AnimationSystem: Entidade {} usa Model@0x{:X}",
+                                             static_cast<uint32_t>(entityID),
+                                             reinterpret_cast<uintptr_t>(model.get())));
 
         // 2. OBTER ESQUELETO E ASSET DE ANIMAÇÃO
         Engine::Skeleton *skeleton = model->getSkeleton();
@@ -93,12 +92,13 @@ void AnimationSystem::update(World &world, float dt)
             animComp.currentTime = std::fmod(animComp.currentTime, duration);
         }
 
-       // 5. PASSO 1 (Rest Pose)
+        // 5. PASSO 1 (Rest Pose)
         std::map<int, glm::mat4> boneFinalLocalTransforms;
         for (const auto &bone : skeleton->bones)
         {
             glm::mat4 restPoseTransform = model->getNodeLocalTransform(bone.name);
-            if (bone.id == skeleton->rootNodeId) {
+            if (bone.id == skeleton->rootNodeId)
+            {
                 Engine::Core::Log::Info(std::format("[ANIM_DEBUG] Rest Pose T (Root): ({:.2f}, {:.2f}, {:.2f})",
                                                     restPoseTransform[3].x, restPoseTransform[3].y, restPoseTransform[3].z));
             }
@@ -109,13 +109,14 @@ void AnimationSystem::update(World &world, float dt)
         // --- ESTA É A LÓGICA CORRETA (que impede o colapso) ---
         for (const auto &pair : currentAnim->channels)
         {
-            const Engine::Asset::AnimationChannel &channel = pair.second; 
-            if (channel.boneId == -1) continue;
+            const Engine::Asset::AnimationChannel &channel = pair.second;
+            if (channel.boneId == -1)
+                continue;
 
             // 1. Obter a Rest Pose (do Passo 5)
             // (Esta é a nossa base, ex: T(0, 0.68, 0))
             glm::mat4 restPoseTransform = boneFinalLocalTransforms[channel.boneId];
-            
+
             // 2. Decompô-la em T, R, S
             glm::vec3 restT, restS;
             glm::quat restR;
@@ -138,7 +139,7 @@ void AnimationSystem::update(World &world, float dt)
                 progress = KeyframeSampler::findKeyframePairAndGetProgress(channel, animComp.currentTime, indexA, indexB);
                 T = KeyframeSampler::interpolateTranslation(channel, progress, indexA, indexB);
             }
-            
+
             if (!channel.rotationKeys.empty())
             {
                 progress = KeyframeSampler::findKeyframePairAndGetProgress(channel, animComp.currentTime, indexA, indexB);
@@ -156,22 +157,32 @@ void AnimationSystem::update(World &world, float dt)
 
             // 6. Salvar a matriz final no mapa
             boneFinalLocalTransforms[channel.boneId] = localTransform;
-            
-            if (channel.boneId == 0) {
-                 Engine::Core::Log::Info(std::format("[DEBUG_SYS] Root (ID 0) LocalTransform Sendo Usada: T({:.2f}, {:.2f}, {:.2f}), S({:.2f}, {:.2f}, {:.2f})",
-                    T.x, T.y, T.z, S.x, S.y, S.z));
+
+            if (channel.boneId == 0)
+            {
+                Engine::Core::Log::Info(std::format("[DEBUG_SYS] Root (ID 0) LocalTransform Sendo Usada: T({:.2f}, {:.2f}, {:.2f}), S({:.2f}, {:.2f}, {:.2f})",
+                                                    T.x, T.y, T.z, S.x, S.y, S.z));
             }
         }
         // --- FIM DA LÓGICA CORRETA ---
-        
-        
+
         // 7. PASSO 3 (Cinemática Forward)
-        const glm::mat4& skeletonRootTransform = model->getSkeletonBindTransform();
-        SkeletonHierarchy::traverseAndCalculateFinalTransforms(
-            *skeleton, 
-            boneFinalLocalTransforms,
-            skeletonRootTransform
-        );
+        
+        // --- ESTA É A CORREÇÃO ---
+        // A 'skeletonRootTransform' (do nó Armature) NÃO deve ser usada,
+        // pois ela causa a transformação duplicada (a inversão Z/Y-up).
+        // O mapa 'boneFinalLocalTransforms' (Passo 5/6) já contém
+        // a transformação local correta para o osso raiz (que é Identity,
+        // como provado pelos logs).
+        
+        // const glm::mat4& skeletonRootTransform = model->getSkeletonBindTransform(); // <-- O BUG ESTÁ AQUI. COMENTE/REMOVA.
+        // const glm::mat4 identityTransform = glm::mat4(1.0f); // <-- ADICIONE ISTO
+
+        // SkeletonHierarchy::traverseAndCalculateFinalTransforms(
+        //     *skeleton, 
+        //     boneFinalLocalTransforms,
+        //     identityTransform // <-- USE A IDENTIDADE AQUI
+        // );
 
         // 8. COPIA OS RESULTADOS PARA O COMPONENTE (A CORREÇÃO SRP)
         skeleton->getFinalBoneTransforms(animComp.finalBoneTransforms);
@@ -179,7 +190,7 @@ void AnimationSystem::update(World &world, float dt)
         // 9. Debug (Logs mantidos)
         if (skeleton->rootNodeId != -1)
         {
-            const Engine::Bone &root = skeleton->bones[skeleton->rootNodeId]; 
+            const Engine::Bone &root = skeleton->bones[skeleton->rootNodeId];
             Engine::Core::Log::Info(std::format("[ANIM_DEBUG] Root ({}) Final T: ({:.2f}, {:.2f}, {:.2f})",
                                                 root.name, root.finalTransformation[3].x, root.finalTransformation[3].y, root.finalTransformation[3].z));
             Engine::Core::Log::Info(std::format("[ANIM_DEBUG] Root ({}) IBM T: ({:.2f}, {:.2f}, {:.2f})",

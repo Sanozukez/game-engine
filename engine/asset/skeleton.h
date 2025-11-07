@@ -75,12 +75,37 @@ namespace Engine
             {
                 Engine::Core::Log::Info(std::format("[DEBUG_SKEL] getFinalBoneTransforms: 'skeleton->bones' tem {} ossos. Retornando matrizes.", bones.size()));
             }
-            // --- FIM DO LOG ---
-            outTransforms.clear();
-            outTransforms.reserve(bones.size());
-            for (const auto &bone : bones)
+            // --- CORREÇÃO CRÍTICA ---
+            // Não destrua o vetor 'outTransforms'. O AnimationComponent
+            // (que é o 'outTransforms') já está pré-dimensionado para MAX_BONES.
+            // Apenas copie as N matrizes calculadas (bones.size()) para
+            // as N primeiras posições do vetor de destino.
+
+            // outTransforms.clear(); // <-- REMOVIDO
+            // outTransforms.reserve(bones.size()); // <-- REMOVIDO
+
+            // Verificação de segurança: O destino (100) deve ser capaz
+            // de conter os ossos (20).
+            if (outTransforms.size() < bones.size())
             {
-                outTransforms.push_back(bone.finalTransformation);
+                 Engine::Core::Log::Error(std::format("[DEBUG_SKEL] O vetor de destino (size={}) é menor que os ossos (size={}). Redimensionando.", 
+                    outTransforms.size(), bones.size()));
+                 // Isso não deveria acontecer se o AnimationComponent
+                 // estiver usando MAX_BONES
+                 outTransforms.resize(bones.size()); 
+            }
+
+            // Copia as matrizes dos ossos calculados
+            for (size_t i = 0; i < bones.size(); ++i)
+            {
+                outTransforms[i] = bones[i].finalTransformation;
+            }
+
+            // (Opcional, mas seguro): Preenche o resto do vetor (de 20 até 100)
+            // com Identity, caso o RenderSystem envie o vetor inteiro.
+            for (size_t i = bones.size(); i < outTransforms.size(); ++i)
+            {
+                outTransforms[i] = glm::mat4(1.0f);
             }
         }
     };

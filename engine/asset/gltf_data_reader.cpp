@@ -163,6 +163,26 @@ std::unique_ptr<Mesh> GltfDataReader::loadPrimitive(
         finalVertices.push_back(newVertex);
     }
 
+    // --- INÍCIO DO DIAGNÓSTICO DE PESOS (WEIGHTS) ---
+    // Se esta primitiva tiver IDs de Bone (JOINTS_0), ela DEVE ter
+    // pesos (WEIGHTS_0). Se não tiver, os pesos serão 0.0f (colapso).
+    if (!boneIDs.empty() && weights.empty())
+    {
+        Engine::Core::Log::Critical(std::format(
+            "[DEBUG_GLTF_READER] Esta primitiva tem {} BoneIDs (JOINTS_0), mas NÃO TEM PESOS (WEIGHTS_0)!",
+            boneIDs.size()
+        ));
+        Engine::Core::Log::Critical("[DEBUG_GLTF_READER] O fallback glm::vec4(0.0f) será usado, CAUSANDO O COLAPSO.");
+    }
+    else if (!boneIDs.empty() && !weights.empty())
+    {
+        Engine::Core::Log::Info(std::format(
+            "[DEBUG_GLTF_READER] Esta primitiva foi carregada com sucesso. ({} BoneIDs, {} Pesos)",
+            boneIDs.size(), weights.size()
+        ));
+    }
+    // --- FIM DO DIAGNÓSTICO ---
+
     // --- ÍNDICES E MATERIAIS ---
     std::vector<uint32_t> indices;
     if (gltfPrimitive->indices)
