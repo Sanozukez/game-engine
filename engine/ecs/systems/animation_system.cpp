@@ -167,22 +167,13 @@ void AnimationSystem::update(World &world, float dt)
         // --- FIM DA LÓGICA CORRETA ---
 
         // 7. PASSO 3 (Cinemática Forward)
-        
-        // --- ESTA É A CORREÇÃO ---
-        // A 'skeletonRootTransform' (do nó Armature) NÃO deve ser usada,
-        // pois ela causa a transformação duplicada (a inversão Z/Y-up).
-        // O mapa 'boneFinalLocalTransforms' (Passo 5/6) já contém
-        // a transformação local correta para o osso raiz (que é Identity,
-        // como provado pelos logs).
-        
-        // const glm::mat4& skeletonRootTransform = model->getSkeletonBindTransform(); // <-- O BUG ESTÁ AQUI. COMENTE/REMOVA.
-        // const glm::mat4 identityTransform = glm::mat4(1.0f); // <-- ADICIONE ISTO
 
-        // SkeletonHierarchy::traverseAndCalculateFinalTransforms(
-        //     *skeleton, 
-        //     boneFinalLocalTransforms,
-        //     identityTransform // <-- USE A IDENTIDADE AQUI
-        // );
+        const glm::mat4 identityTransform = glm::mat4(1.0f);
+
+        SkeletonHierarchy::traverseAndCalculateFinalTransforms(
+            *skeleton,
+            boneFinalLocalTransforms,
+            identityTransform);
 
         // 8. COPIA OS RESULTADOS PARA O COMPONENTE (A CORREÇÃO SRP)
         skeleton->getFinalBoneTransforms(animComp.finalBoneTransforms);
