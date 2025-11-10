@@ -103,6 +103,11 @@ namespace Engine
             
             // --- CORREÇÃO: Adicionado ';' em falta ---
             const AnimationAsset *getAnimation(uint32_t nameHash) const;
+            
+            // NOVO v101: Buscar animação por nome de string (não hash)
+            const AnimationAsset* getAnimationByName(const std::string& name) const;
+            uint32_t getAnimationIndex(const std::string& name) const;
+            size_t getAnimationCount() const { return m_animations.size(); }
             // --- FIM DA CORREÇÃO ---
 
             const std::vector<std::string> getNodeChildren(const std::string &nodeName) const;

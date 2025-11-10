@@ -59,6 +59,73 @@ void AnimationSystem::playAnimation(Component::AnimationComponent& animComp, uin
     animComp.blendSpeed = (blendDuration > 0.0f) ? (1.0f / blendDuration) : 1000.0f; // Blend speed em 1/s
 }
 
+// =========================================================================
+// NOVO v101: playAnimationByName - Usa AnimationMapping do AssetManager
+// =========================================================================
+void AnimationSystem::playAnimationByName(Component::AnimationComponent& animComp, 
+                                         const std::shared_ptr<Engine::Asset::Model>& model,
+                                         const std::string& engineName)
+{
+    if (!model) {
+        Engine::Core::Log::Error("playAnimationByName: Model inválido!");
+        return;
+    }
+
+    // 1. Calcular hash do engine_name
+    std::hash<std::string> hasher;
+    uint32_t engineNameHash = static_cast<uint32_t>(hasher(engineName));
+
+    // 2. Buscar AnimationMapping no AssetManager
+    const AnimationMapping* mapping = m_assetManager.getAnimationMapping(engineNameHash);
+    
+    if (!mapping) {
+        // FALLBACK: Tentar "idle"
+        Engine::Core::Log::Warn(std::format("Animação '{}' não encontrada no asset dictionary! Tentando 'idle'...", engineName));
+        
+        if (engineName != "idle") {
+            playAnimationByName(animComp, model, "idle"); // Recursão com fallback
+            return;
+        } else {
+            // Último fallback: primeira animação disponível
+            if (model->getAnimationCount() > 0) {
+                Engine::Core::Log::Warn("'idle' também não encontrado! Usando primeira animação disponível.");
+                playAnimation(animComp, 0, 0.2f);
+                return;
+            } else {
+                Engine::Core::Log::Error("Model não tem NENHUMA animação! Impossível tocar animação.");
+                return;
+            }
+        }
+    }
+
+    // 3. Buscar animação no Model usando source_name
+    const Engine::Asset::AnimationAsset* anim = model->getAnimationByName(mapping->source_name);
+    
+    if (!anim) {
+        Engine::Core::Log::Error(std::format("Animação '{}' mapeada para '{}', mas '{}' não existe no GLB!", 
+                                             engineName, mapping->source_name, mapping->source_name));
+        // Fallback para idle
+        if (engineName != "idle") {
+            playAnimationByName(animComp, model, "idle");
+        }
+        return;
+    }
+
+    // 4. Aplicar metadata do AnimationMapping
+    uint32_t animID = model->getAnimationIndex(mapping->source_name);
+    float blendTime = mapping->blend_in_time;
+    
+    // Atualizar playbackSpeed do componente (será usado no update)
+    animComp.playbackSpeed = mapping->default_playback_speed;
+    
+    // 5. Iniciar animação com blend configurado
+    playAnimation(animComp, animID, blendTime);
+    
+    Engine::Core::Log::Info(std::format("Tocando animação: '{}' -> '{}' (speed: {:.2f}, blend: {:.2f}s)", 
+                                        engineName, mapping->source_name, 
+                                        mapping->default_playback_speed, blendTime));
+}
+
 void AnimationSystem::update(World& world, float dt)
 {
     PROFILE_SCOPE("AnimationSystem::update"); // <-- PROFILING

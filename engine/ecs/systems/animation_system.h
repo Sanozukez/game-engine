@@ -22,6 +22,11 @@ public:
     // Método público para trocar animações com blending
     void playAnimation(Component::AnimationComponent& animComp, uint32_t newAnimationID, float blendDuration = 0.3f);
 
+    // NOVO v101: Trocar animação usando engine_name (ex: "idle", "walk") com metadata do AssetManager
+    void playAnimationByName(Component::AnimationComponent& animComp, 
+                            const std::shared_ptr<Engine::Asset::Model>& model,
+                            const std::string& engineName);
+
 private:
     Engine::Asset::AssetManager& m_assetManager;
     Engine::Animation::AnimationConfig m_config;

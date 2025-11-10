@@ -214,6 +214,32 @@ namespace Engine
             return (it != m_animations.end()) ? it->second.get() : nullptr;
         }
 
+        // =========================================================================
+        // NOVO v101: Buscar animação por nome (string)
+        // =========================================================================
+        const AnimationAsset* Model::getAnimationByName(const std::string& name) const
+        {
+            std::hash<std::string> hasher;
+            uint32_t nameHash = static_cast<uint32_t>(hasher(name));
+            return getAnimation(nameHash);
+        }
+
+        uint32_t Model::getAnimationIndex(const std::string& name) const
+        {
+            std::hash<std::string> hasher;
+            uint32_t nameHash = static_cast<uint32_t>(hasher(name));
+            
+            // Procurar o índice (posição no map)
+            uint32_t index = 0;
+            for (const auto& [hash, anim] : m_animations) {
+                if (hash == nameHash) {
+                    return index;
+                }
+                ++index;
+            }
+            return 0; // Fallback: primeira animação
+        }
+
         // --- CORREÇÃO: Implementação movida do .h para cá ---
         int Model::getBoneIndexByName(const std::string &boneName) const
         {
