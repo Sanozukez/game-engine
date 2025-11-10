@@ -5,7 +5,7 @@
 #include "gltf_loader.h" // Precisamos do loader para carregar o GLB
 #include "../core/log.h"
 #include "../core/path_utils.h"
-#include "../../shared/mmap_format/SceneFileFormat.h"
+#include "../../shared/mmap_format/SceneFileFormat.h" // AssetEntry, AnimationMapping, Header
 
 #include <fstream>
 
@@ -23,7 +23,6 @@ namespace Engine
         bool AssetManager::loadAssetDictionary()
         {
             // 1. Resolve o caminho para o arquivo binário
-            // Usa path_utils para resolver o caminho da Engine
             std::string fullPath = Engine::resolveEnginePath(ASSET_DICTIONARY_BIN_PATH).string();
 
             std::ifstream file(fullPath, std::ios::binary | std::ios::in);
@@ -33,30 +32,73 @@ namespace Engine
                 return false;
             }
 
-            // 2. Leitura do Header (Contagem total de entradas)
-            uint32_t total_count = 0;
-            file.read(reinterpret_cast<char *>(&total_count), sizeof(uint32_t));
+            // 2. NOVO v101: Ler AssetDictionaryHeader
+            AssetDictionaryHeader header = {};
+            file.read(reinterpret_cast<char*>(&header), sizeof(AssetDictionaryHeader));
 
-            if (total_count == 0)
+            // Validar magic number
+            if (header.magic != 0x41535444) // "ASTD"
+            {
+                Engine::Core::Log::Error(std::format("AssetManager: Magic number invalido! Esperado 0x41535444, recebido 0x{:08X}", header.magic));
+                return false;
+            }
+
+            // Validar versão
+            if (header.version != 101)
+            {
+                Engine::Core::Log::Warn(std::format("AssetManager: Versao do dicionario {} nao suportada! Esperado 101.", header.version));
+                // Poderia tentar ler v100 aqui no futuro (backward compatibility)
+                return false;
+            }
+
+            Engine::Core::Log::Info(std::format("AssetManager: Carregando dicionario v{} ({} assets)...", 
+                                                header.version, header.asset_count));
+
+            if (header.asset_count == 0)
             {
                 Engine::Core::Log::Warn("AssetManager: Dicionario binario vazio.");
                 return true;
             }
 
-            // 3. Leitura e Mapeamento das Entradas
-            // Nota: O tamanho da AssetEntry é crucial.
-            // Assumimos que o compilador escreveu o tamanho correto de AssetEntry.
-            std::vector<AssetEntry> entries(total_count);
-
-            file.read(reinterpret_cast<char *>(entries.data()), total_count * sizeof(AssetEntry));
+            // 3. Ler AssetEntry[] (v101: 152 bytes cada)
+            std::vector<AssetEntry> entries(header.asset_count);
+            file.read(reinterpret_cast<char*>(entries.data()), header.asset_count * sizeof(AssetEntry));
 
             for (const auto &entry : entries)
             {
-                // Mapeamento: ID -> Caminho (string)
+                // Mapeamento: ID -> Caminho
                 m_assetIDToPathMap[entry.asset_id] = std::string(entry.asset_path);
             }
 
-            Engine::Core::Log::Info(std::format("AssetManager: Dicionario binario carregado com sucesso ({} assets).", total_count));
+            // 4. NOVO v101: Ler AnimationMapping[] section (se existir)
+            if (header.animation_section_offset > 0)
+            {
+                file.seekg(header.animation_section_offset, std::ios::beg);
+
+                // Calcular quantas AnimationMapping existem (total de todos os assets)
+                size_t total_anim_mappings = 0;
+                for (const auto& entry : entries)
+                {
+                    total_anim_mappings += entry.animation_count;
+                }
+
+                if (total_anim_mappings > 0)
+                {
+                    std::vector<AnimationMapping> all_animations(total_anim_mappings);
+                    file.read(reinterpret_cast<char*>(all_animations.data()), 
+                             total_anim_mappings * sizeof(AnimationMapping));
+
+                    // Popular m_animationMappings (hash -> AnimationMapping)
+                    for (const auto& anim : all_animations)
+                    {
+                        m_animationMappings[anim.engine_name_hash] = anim;
+                    }
+
+                    Engine::Core::Log::Info(std::format("  -> {} animation mappings carregados", total_anim_mappings));
+                }
+            }
+
+            Engine::Core::Log::Info(std::format("AssetManager: Dicionario v101 carregado com sucesso!"));
             return true;
         }
 
@@ -164,6 +206,20 @@ namespace Engine
 
             Engine::Core::Log::Error(std::format("AssetManager: Falha ao carregar asset '{}' (ID: {}).", assetName, assetID));
             return nullptr;
+        }
+
+        // =========================================================================
+        // NOVO v101: ANIMATION MAPPING LOOKUP
+        // =========================================================================
+        
+        const AnimationMapping* AssetManager::getAnimationMapping(uint32_t engineNameHash) const
+        {
+            auto it = m_animationMappings.find(engineNameHash);
+            if (it != m_animationMappings.end())
+            {
+                return &it->second;
+            }
+            return nullptr; // Não encontrado
         }
 
     } // namespace Asset

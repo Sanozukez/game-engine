@@ -6,6 +6,7 @@
 #include <string>
 #include <map>
 #include <cstdint>
+#include "../../shared/mmap_format/SceneFileFormat.h" // AnimationMapping, AssetEntry
 
 // Forward Declaration: Para evitar dependência circular e include pesado
 namespace Engine::Asset
@@ -31,6 +32,10 @@ namespace Engine
             // B. TRADUÇÃO (O Mapa de Tradução de ID -> Path)
             // Usado para traduzir o ID numérico do MMAP para a string real do GLB.
             std::map<uint32_t, std::string> m_assetIDToPathMap;
+
+            // C. NOVO v101: Mapa de Animation Mappings (engine_name_hash -> AnimationMapping)
+            // Permite lookup rápido: hash("idle") -> AnimationMapping com source_name + metadata
+            std::map<uint32_t, AnimationMapping> m_animationMappings;
 
             // Métodos Singleton e de utilidade
             AssetManager();
@@ -58,6 +63,9 @@ namespace Engine
 
             // 3. Helper de Dev (usado pelo WorldInitializer)
             static uint32_t getAssetIDByName(const std::string &assetName);
+
+            // NOVO v101: Lookup de animation metadata por hash do engine_name
+            const AnimationMapping* getAnimationMapping(uint32_t engineNameHash) const;
 
             // (Futuro: Adicionar getTexture e getAudio)
         };
