@@ -88,12 +88,70 @@ int main(int argc, char *argv[])
         strncpy(entry.asset_path, asset_path.c_str(), MAX_ASSET_PATH_LENGTH - 1);
         entry.asset_path[MAX_ASSET_PATH_LENGTH - 1] = '\0'; // Garantir terminação nula
 
-        asset_entries.push_back(entry);
+        // NOVO v101: Processar animations (se existir)
+        if (asset_json.contains("animations") && asset_json["animations"].is_array())
+        {
+            size_t anim_count = asset_json["animations"].size();
+            if (anim_count > 0)
+            {
+                entry.animation_count = static_cast<uint32_t>(anim_count);
+                // IMPORTANTE: Salvar ÍNDICE no vetor global (será convertido para byte offset depois)
+                entry.animation_data_offset = all_animation_mappings.size();
+                
+                std::cout << std::format(" -> ID: {} | Path: {} | Animations: {}", 
+                                        asset_id, asset_path, entry.animation_count) << std::endl;
 
-        std::cout << std::format(" -> ID: {} | Path: {}", asset_id, asset_path) << std::endl;
+            // Processar cada animação
+            for (const auto &anim_json : asset_json["animations"])
+            {
+                AnimationMapping anim = {};
+                
+                std::string engine_name = anim_json.value("engine_name", "");
+                std::string source_name = anim_json.value("source_name", "");
+                
+                if (engine_name.empty() || source_name.empty())
+                {
+                    std::cerr << "AVISO: Animacao sem engine_name ou source_name. Pulando." << std::endl;
+                    continue;
+                }
+                
+                // Hash do engine_name (usado para lookup rápido)
+                anim.engine_name_hash = static_cast<uint32_t>(hasher(engine_name));
+                
+                // Copiar source_name (nome no GLTF)
+                strncpy(anim.source_name, source_name.c_str(), MAX_ANIM_NAME_LENGTH - 1);
+                anim.source_name[MAX_ANIM_NAME_LENGTH - 1] = '\0';
+                
+                // Metadata
+                anim.duration = anim_json.value("duration", 0.0f);
+                anim.blend_in_time = anim_json.value("blend_in_time", 0.2f);
+                anim.blend_out_time = anim_json.value("blend_out_time", 0.2f);
+                anim.default_playback_speed = anim_json.value("playback_speed", 1.0f);
+                anim.movement_speed = anim_json.value("movement_speed", 0.0f);
+                anim.looping = anim_json.value("looping", true) ? 1 : 0;
+                anim.priority = static_cast<uint8_t>(anim_json.value("priority", 100));
+                
+                all_animation_mappings.push_back(anim);
+                
+                std::cout << std::format("    - {} -> {} (speed: {:.2f}, loop: {})",
+                                        engine_name, source_name, 
+                                        anim.default_playback_speed, anim.looping) << std::endl;
+            }
+            }
+        }
+        else
+        {
+            // Asset sem animações
+            entry.animation_count = 0;
+            entry.animation_data_offset = 0;
+            
+            std::cout << std::format(" -> ID: {} | Path: {}", asset_id, asset_path) << std::endl;
+        }
+
+        asset_entries.push_back(entry);
     }
 
-    // 3. Escrita do Arquivo Binário (asset_dictionary.bin)
+    // 3. Escrita do Arquivo Binário (asset_dictionary.bin) - FORMATO v101
 
     // O nome lógico do arquivo
     const char *LOGICAL_FILENAME = "assets_dictionary.bin";
@@ -109,18 +167,51 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Escreve o Header (Contagem total de entradas)
-    uint32_t total_count = static_cast<uint32_t>(asset_entries.size());
-    outfile.write(reinterpret_cast<const char *>(&total_count), sizeof(uint32_t));
+    // NOVO v101: Calcular offsets
+    size_t header_size = sizeof(AssetDictionaryHeader);
+    size_t entries_size = asset_entries.size() * sizeof(AssetEntry);
+    uint64_t animation_section_offset = header_size + entries_size;
 
-    // Escreve o array de AssetEntry structs
+    // CRÍTICO: Converter índices de animação para byte offsets
+    for (auto& entry : asset_entries)
+    {
+        if (entry.animation_count > 0)
+        {
+            // animation_data_offset estava guardando o ÍNDICE, agora convertemos para BYTE OFFSET
+            size_t anim_index = entry.animation_data_offset;
+            entry.animation_data_offset = animation_section_offset + (anim_index * sizeof(AnimationMapping));
+        }
+    }
+
+    // Escreve o Header v101
+    AssetDictionaryHeader header = {};
+    header.magic = 0x41535444;  // "ASTD"
+    header.version = 101;
+    header.padding = 0;
+    header.asset_count = static_cast<uint32_t>(asset_entries.size());
+    header.animation_section_offset = all_animation_mappings.empty() ? 0 : animation_section_offset;
+    header.reserved[0] = 0;
+    header.reserved[1] = 0;
+
+    outfile.write(reinterpret_cast<const char *>(&header), sizeof(AssetDictionaryHeader));
+
+    // Escreve o array de AssetEntry structs (v101: 152 bytes cada)
     outfile.write(reinterpret_cast<const char *>(asset_entries.data()),
                   asset_entries.size() * sizeof(AssetEntry));
 
+    // NOVO v101: Escrever AnimationMapping[] section
+    if (!all_animation_mappings.empty())
+    {
+        outfile.write(reinterpret_cast<const char *>(all_animation_mappings.data()),
+                      all_animation_mappings.size() * sizeof(AnimationMapping));
+    }
+
     outfile.close();
 
-    std::cout << std::format("\nCompilacao de Dicionario concluida! {} assets compilados em {}.",
-                             total_count, LOGICAL_FILENAME)
+    std::cout << std::format("\nCompilacao de Dicionario concluida! (v101)")
+              << std::format("\n  {} assets compilados", header.asset_count)
+              << std::format("\n  {} animation mappings", all_animation_mappings.size())
+              << std::format("\n  Salvo em: {}", LOGICAL_FILENAME)
               << std::endl;
 
     return 0;

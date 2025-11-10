@@ -14,9 +14,34 @@
     },
     {
       "name": "character_test.glb",
-      "type": "Model",
+      "type": "CharacterModel",
+      "type_id": 3,
       "path": "character_test.glb",
-      "description": "Modelo de personagem teste."
+      "description": "Modelo de personagem teste com animações.",
+      "animations": [
+        {
+          "engine_name": "idle",
+          "source_name": "idle",
+          "duration": 2.5,
+          "blend_in_time": 0.2,
+          "blend_out_time": 0.2,
+          "playback_speed": 1.0,
+          "movement_speed": 0.0,
+          "looping": true,
+          "priority": 100
+        },
+        {
+          "engine_name": "walk",
+          "source_name": "walk",
+          "duration": 0.533,
+          "blend_in_time": 0.15,
+          "blend_out_time": 0.15,
+          "playback_speed": 1.33,
+          "movement_speed": 5.5,
+          "looping": true,
+          "priority": 110
+        }
+      ]
     },
     {
       "name": "TER_Forest_Base.glb",
