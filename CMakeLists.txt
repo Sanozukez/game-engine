@@ -34,3 +34,6 @@ add_subdirectory(engine)
 
 # Depois, adicione o diretório da aplicação/executável.
 add_subdirectory(src)
+
+# Adicionar testes (opcional, validação de structs etc.)
+add_subdirectory(tests)

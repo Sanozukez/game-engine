@@ -100,17 +100,59 @@ enum class EntityType : uint8_t
 // =========================================================================================
 
 #define MAX_ASSET_PATH_LENGTH 128
+#define MAX_ANIM_NAME_LENGTH 60  // 60 bytes para nome da animação no GLTF
 
-// Estrutura do Dicionário de Assets (será compilado no asset_dictionary.bin)
-struct AssetEntry {
-    uint32_t asset_id;                        // O ID numérico (hash) que está no MMAP
-    char asset_path[MAX_ASSET_PATH_LENGTH];   // O caminho real do arquivo GLB/Texture (string de tamanho fixo)
-    uint8_t asset_type;                       // 1=Model, 2=Texture, 3=Audio (Para o AssetManager)
-    uint8_t reserved[3];                      // Padding para alinhamento futuro
+// -----------------------------------------------------------------------------------------
+// 5.1 ASSET DICTIONARY HEADER (Version 101)
+// -----------------------------------------------------------------------------------------
+struct AssetDictionaryHeader {
+    uint32_t magic;                     // 0x41535444 = "ASTD" (Asset Dictionary)
+    uint16_t version;                   // 101 (formato atual)
+    uint16_t padding;                   // Padding para alinhamento de 4 bytes
+    
+    uint32_t asset_count;               // Número total de AssetEntry
+    uint64_t animation_section_offset;  // Offset para AnimationMapping[] (0 se sem animations)
+    
+    uint32_t reserved[2];               // Reservado para expansão futura
 };
+// sizeof(AssetDictionaryHeader) = 28 bytes (4+2+2+4+8+8 = 28)
 
-// ... (Você pode adicionar um AssetDictionaryHeader para saber o número total de entradas)
-// struct AssetDictionaryHeader { uint32_t entry_count; };
+// -----------------------------------------------------------------------------------------
+// 5.2 ASSET ENTRY (Entrada Individual do Dicionário)
+// -----------------------------------------------------------------------------------------
+struct AssetEntry {
+    uint32_t asset_id;                        // Hash do asset path (usado no MMAP)
+    char asset_path[MAX_ASSET_PATH_LENGTH];   // Caminho do arquivo GLB/Texture
+    uint8_t asset_type;                       // 1=Model, 2=Texture, 3=CharacterModel, 4=Audio
+    uint8_t reserved[7];                      // Padding para alinhamento (8 bytes total)
+    
+    // NOVO (v101): Dados de Animação (só usado se asset_type == 3 - CharacterModel)
+    uint32_t animation_count;                 // Quantas AnimationMapping tem (0 se não é character)
+    uint64_t animation_data_offset;           // Offset no arquivo para AnimationMapping[] (0 se count=0)
+};
+// sizeof(AssetEntry) v100: 136 bytes
+// sizeof(AssetEntry) v101: 152 bytes (4 + 128 + 8 + 4 + 8 = 152)
+
+// -----------------------------------------------------------------------------------------
+// 5.3 ANIMATION MAPPING (Metadados de Animação - Version 101)
+// -----------------------------------------------------------------------------------------
+struct AnimationMapping {
+    uint32_t engine_name_hash;          // Hash do nome usado no código (ex: hash("idle"))
+    char source_name[MAX_ANIM_NAME_LENGTH]; // Nome no arquivo GLTF (ex: "idle_combat")
+    
+    // Metadata de Reprodução
+    float duration;                     // Duração em segundos (para validação)
+    float blend_in_time;                // Tempo de fade in (segundos)
+    float blend_out_time;               // Tempo de fade out (segundos)
+    float default_playback_speed;       // Multiplicador de velocidade (1.0 = normal)
+    float movement_speed;               // Velocidade de movimento (m/s, 0 = estático)
+    
+    // Flags de Comportamento
+    uint8_t looping;                    // 1 = loop, 0 = one-shot
+    uint8_t priority;                   // 0-255 (maior valor = maior prioridade, interrompe menor)
+    uint8_t reserved[2];                // Padding para alinhamento de 4 bytes
+};
+// sizeof(AnimationMapping) = 88 bytes (4 + 60 + 20 + 4 = 88)
 
 // =========================================================================================
 // 6. BLOCOS DE DADOS ESPECÍFICOS (APONTADOS PELO SceneNode::specific_data_offset)

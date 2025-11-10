@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
 
     // 2. Processamento e Geração das Entradas Binárias
     std::vector<AssetEntry> asset_entries;
+    std::vector<AnimationMapping> all_animation_mappings; // NOVO v101: Todas as animations de todos os assets
     std::hash<std::string> hasher;
 
     std::cout << "Processando " << data["assets"].size() << " entradas de asset..." << std::endl;
