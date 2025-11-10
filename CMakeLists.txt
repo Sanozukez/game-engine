@@ -13,6 +13,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Isso garante que todas as unidades de compilação que usam GLM o vejam.
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 
+# **** PROFILING: Habilitar profiling em Debug builds ****
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_definitions(ENABLE_PROFILING)
+    message(STATUS "Profiling ENABLED (Debug build)")
+else()
+    message(STATUS "Profiling DISABLED (Release build)")
+endif()
+
 set(IGG_COMPONENTS "IMGUI;GLFW;GLAD;GLM" CACHE STRING "The components to import and build")
 foreach (comp IN ITEMS ${IGG_COMPONENTS})
     set(IMPORT_${comp} ON)

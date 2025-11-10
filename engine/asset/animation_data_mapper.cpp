@@ -164,23 +164,29 @@ std::unique_ptr<Engine::Skeleton> Engine::AnimationDataMapper::mapSkeleton(
         return nullptr;
     }
 
-    // ... (Lógica de leitura de IBMs)
+    // Leitura de IBMs COM CORREÇÃO
     std::vector<glm::mat4> inverseBindMatrices;
     if (skin->inverse_bind_matrices)
     {
         const cgltf_accessor *ibm_accessor = skin->inverse_bind_matrices;
         inverseBindMatrices.resize(ibm_accessor->count);
+        
+        // ÚNICA CORREÇÃO QUE MANTÉM ESTRUTURA: X=180°
+        glm::mat4 coordinateCorrection = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        
         for (cgltf_size i = 0; i < ibm_accessor->count; ++i)
         {
             float data_mat[16];
             if (cgltf_accessor_read_float(ibm_accessor, i, data_mat, 16))
             {
-                inverseBindMatrices[i] = glm::make_mat4(data_mat);
+                glm::mat4 ibm_original = glm::make_mat4(data_mat);
+                // Aplicar correção X=180° nas IBMs
+                inverseBindMatrices[i] = ibm_original * glm::inverse(coordinateCorrection);
             }
             else
             {
                 inverseBindMatrices[i] = glm::mat4(1.0f);
-                Log::Error("[AnimDataMap] Falha ao ler Matriz Inverse Bind (IBM). Usando Identity.");
+                Log::Error("[AnimDataMap] Falha ao ler IBM. Usando Identity.");
             }
         }
     }
@@ -225,36 +231,38 @@ std::unique_ptr<Engine::Skeleton> Engine::AnimationDataMapper::mapSkeleton(
         Log::Info(std::format("[AnimDataMap] Nó Raiz do Esqueleto detectado: {}.", skeleton->bones[detectedRootId].name));
     }
 
-    // 4. Conecta os Bones na Hierarquia (Multi-Root Traversal)
-    if (skeleton->rootNodeId != -1)
-    {
-        // Pega o cgltf_node* que corresponde ao nosso bone "root"
-        // (Isso assume que o índice 'i' em 'skin->joints[i]' corresponde ao bone.id)
-        const cgltf_node *rootGltfNode = skin->joints[skeleton->rootNodeId];
-        int rootNodeIndex = static_cast<int>(rootGltfNode - data->nodes);
+    // 4. Conecta os Bones na Hierarquia (preferir skin->skeleton quando existir)
+const cgltf_node* startNode = nullptr;
 
-        Core::Log::Info(std::format("[DEBUG_MAP] Iniciando travessia da hierarquia de ossos a partir do root detectado: '{}' (ID: {})",
-                                    skeleton->bones[skeleton->rootNodeId].name, rootNodeIndex));
+if (skin->skeleton) {
+    // Comece pelo nó raiz declarado do skin (pode NÃO ser um osso)
+    startNode = skin->skeleton;
+    Core::Log::Info("[AnimDataMap] Usando skin->skeleton como raiz da hierarquia.");
+} else if (skeleton->rootNodeId != -1) {
+    // Fallback: algum joint “root” detectado
+    startNode = skin->joints[skeleton->rootNodeId];
+    Core::Log::Warn("[AnimDataMap] skin->skeleton ausente; usando joint detectado como raiz.");
+} else {
+    Core::Log::Error("[AnimDataMap] Falha: sem skin->skeleton e sem root joint. Hierarquia não pode ser construída.");
+    return skeleton; // retorna com bones mas sem hierarquia
+}
 
-        // Inicia a recursão a partir do root detectado
-        processBoneNode(
-            model,
-            rootNodeIndex,
-            -1, // -1 = parentId do root
-            data,
-            skeleton->boneNameMap,
-            skeleton->bones);
-    }
-    else
-    {
-        Core::Log::Error("[AnimDataMap] Falha fatal: Nenhum nó raiz (root) foi detectado. Hierarquia não pode ser construída.");
-    }
-    // --- FIM DA NOVA LÓGICA ---
+int startIndex = static_cast<int>(startNode - data->nodes);
 
-    if (skeleton->rootNodeId != -1)
-    {
-        skeleton->bones[skeleton->rootNodeId].parentId = -1;
-    }
+// Inicia a recursão a partir do startNode
+processBoneNode(
+    model,
+    startIndex,
+    -1, // pai inicial
+    data,
+    skeleton->boneNameMap,
+    skeleton->bones
+);
+
+// Garanta que, se há um joint “root” no mapeamento, ele tenha parent -1
+if (skeleton->rootNodeId != -1) {
+    skeleton->bones[skeleton->rootNodeId].parentId = -1;
+}
 
     return skeleton;
 }
@@ -328,12 +336,25 @@ std::vector<std::unique_ptr<Engine::Asset::AnimationAsset>> Engine::AnimationDat
             else if (channel->target_path == cgltf_animation_path_type_rotation)
             {
                 boneChannel.rotationKeys.reserve(keyTimes.size());
+                
+                // ÚNICA CORREÇÃO QUE MANTÉM ESTRUTURA: X=180°
+                // Consequências: Inverte Y (de ponta cabeça) + Z (olhando pra trás)
+                // Workarounds necessários em Transform + Controles
+                glm::quat coordinateCorrection = glm::angleAxis(glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+                
                 for (size_t j = 0; j < keyTimes.size(); ++j)
                 {
                     glm::vec4 value;
                     cgltf_accessor_read_float(outputAccessor, j, glm::value_ptr(value), 4);
+                    
+                    // GLTF stores as (x,y,z,w), convert to GLM (w,x,y,z)
+                    glm::quat rot(value.w, value.x, value.y, value.z);
+                    
+                    // Aplicar correção X=180°
+                    glm::quat correctedRot = coordinateCorrection * rot;
+                    
                     boneChannel.rotationKeys.push_back(
-                        {keyTimes[j], Engine::Math::Quat(glm::quat(value.w, value.x, value.y, value.z))});
+                        {keyTimes[j], Engine::Math::Quat(correctedRot)});
                 }
             }
             else if (channel->target_path == cgltf_animation_path_type_scale)

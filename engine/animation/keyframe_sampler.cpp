@@ -1,4 +1,5 @@
 // engine/animation/keyframe_sampler.cpp
+
 #include "keyframe_sampler.h"
 #include "../core/log.h"
 #include <glm/gtx/norm.hpp>       // Para o slerp
@@ -10,50 +11,70 @@
 namespace Engine
 {
 
-    // Helper: Usa a lista de positionKeys para encontrar o tempo, assumindo que T, R e S estão sincronizados.
+    // Escolhe a trilha de tempo "fonte" para o canal:
+    // 1) se houver rotationKeys, usa eles (ângulos quase sempre animam!);
+    // 2) senão, se houver positionKeys, usa eles;
+    // 3) senão, se houver scaleKeys, usa eles;
+    // 4) vazio => sem animação (progress=0 e indices=0).
+    static inline size_t pickKeyCount(const Asset::AnimationChannel &c, int &which)
+    {
+        if (!c.rotationKeys.empty()) { which = 0; return c.rotationKeys.size(); }
+        if (!c.positionKeys.empty()) { which = 1; return c.positionKeys.size(); }
+        if (!c.scaleKeys.empty())    { which = 2; return c.scaleKeys.size(); }
+        which = -1; return 0;
+    }
+
+    static inline float getKeyTimeAt(const Asset::AnimationChannel &c, int which, size_t i)
+    {
+        switch (which)
+        {
+        case 0: return c.rotationKeys[i].time;
+        case 1: return c.positionKeys[i].time;
+        case 2: return c.scaleKeys[i].time;
+        default: return 0.0f;
+        }
+    }
+
     float KeyframeSampler::findKeyframePairAndGetProgress(
-        const Asset::AnimationChannel &channel, // <-- MUDOU
+        const Asset::AnimationChannel &channel,
         float animationTime,
         size_t &indexA,
         size_t &indexB)
     {
-        // (A sua lógica de 'findKeyframePair...' parece robusta. 
-        // No entanto, ela assume que T, R, e S têm o *mesmo número* de 
-        // keyframes e os *mesmos tempos*, o que é uma otimização.
-        // O seu código antigo (animation_utils) procurava T, R, e S
-        // separadamente. Vamos manter a sua lógica otimizada por agora,
-        // mas o bug de animação "bugada" pode estar aqui se T, R, S
-        // não estiverem sincronizados.)
-        const auto &keyframes = channel.positionKeys; // <-- Baseia-se apenas nas Posições
-        const size_t keyCount = keyframes.size(); 
-
-        if (keyCount <= 1)
+        int which = -1;
+        const size_t keyCount = pickKeyCount(channel, which);
+        if (which < 0 || keyCount == 0)
         {
             indexA = indexB = 0;
             return 0.0f;
         }
 
-        if (animationTime >= keyframes.back().time)
+        if (keyCount == 1)
         {
-            indexA = indexB = keyCount - 1;
+            indexA = indexB = 0;
             return 0.0f;
         }
 
+        // Se o tempo está além do último, prende no último par
+        const float lastTime = getKeyTimeAt(channel, which, keyCount - 1);
+        if (animationTime >= lastTime)
+        {
+            indexA = keyCount - 1;
+            indexB = indexA;
+            return 0.0f;
+        }
+
+        // Busca linear simples (os counts são pequenos; dá pra otimizar depois)
         for (size_t i = 0; i < keyCount - 1; ++i)
         {
-            if (animationTime < keyframes[i + 1].time)
+            const float t0 = getKeyTimeAt(channel, which, i);
+            const float t1 = getKeyTimeAt(channel, which, i + 1);
+            if (animationTime < t1)
             {
                 indexA = i;
                 indexB = i + 1;
-
-                const float startTime = keyframes[indexA].time;
-                const float endTime = keyframes[indexB].time;
-                const float totalTime = endTime - startTime;
-
-                if (totalTime <= 0.0f)
-                    return 0.0f;
-
-                return (animationTime - startTime) / totalTime;
+                const float dt = (t1 - t0);
+                return (dt > 0.0f) ? (animationTime - t0) / dt : 0.0f;
             }
         }
 

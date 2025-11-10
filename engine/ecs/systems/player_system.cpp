@@ -46,6 +46,10 @@ namespace Engine
                         glm::vec3 camF = m_camera.getForwardVector();
                         glm::vec3 camR = m_camera.getRightVector();
 
+                        // WORKAROUND: Rotation Y=180° inverte Z dos controles
+                        camF.z = -camF.z;
+                        camR.z = -camR.z;
+
                         glm::vec3 dir(0.0f);
                         if (w)
                             dir += camF;
@@ -68,10 +72,11 @@ namespace Engine
                         mv.isCameraAttachedToPlayer = true;
                         mv.isCameraOrbitModeActive = false;
 
-                        // Alinha o player ao yaw da câmera (como no estado acoplado)
+                        // Rotação baseada na câmera (sem Y=180° - causava orientação inversa)
                         auto &camInput = world.getComponent<Component::CameraInput>(playerID);
+                        float camYaw = glm::radians(camInput.yaw_degrees);
                         tr.rotation = Engine::Math::Quat(
-                            glm::angleAxis(glm::radians(camInput.yaw_degrees), glm::vec3(0.0f, 1.0f, 0.0f)));
+                            glm::angleAxis(camYaw, glm::vec3(0.0f, 1.0f, 0.0f)));
 
                         // sai do bloco CTM neste frame (sem executar o follow CTM abaixo)
                     }
@@ -87,7 +92,7 @@ namespace Engine
                         {
                             tr.position += Engine::Math::Vec3(glm::normalize(to) * vel);
 
-                            // personagem olha para o caminho (independente da câmera)
+                            // Rotação na direção do movimento (SEM inversão - X=180° pipeline não afeta atan2)
                             glm::vec3 horiz(to.x, 0.0f, to.z);
                             if (glm::length(horiz) > 1e-3f)
                             {
@@ -122,12 +127,16 @@ namespace Engine
                         // --- ESTADO 2: ACOPLADO (ativado por A/D/Q/E/W/S) ---
 
                         // Direções baseadas na câmera (niveladas no plano XZ)
-                        glm::vec3 camF = m_camera.getForwardVector(); // orbit já é XZ, mas garantimos
+                        glm::vec3 camF = m_camera.getForwardVector();
                         glm::vec3 camR = m_camera.getRightVector();
                         camF.y = 0.0f;
                         camR.y = 0.0f;
                         camF = Engine::Camera::Math::safeNormalize(camF);
                         camR = Engine::Camera::Math::safeNormalize(camR);
+
+                        // WORKAROUND: Rotation Y=180° inverte Z dos controles
+                        camF.z = -camF.z;
+                        camR.z = -camR.z;
 
                         glm::vec3 dir(0.0f);
                         const bool isRMB = m_inputManager.IsRightMouseButtonPressed();
@@ -138,19 +147,20 @@ namespace Engine
                         if (m_inputManager.IsKeyPressed(GLFW_KEY_S))
                             dir -= camF;
 
-                        // Q/E = strafe
+                        // Q/E = strafe (invertido para compensar X=180° pipeline)
                         if (m_inputManager.IsKeyPressed(GLFW_KEY_Q))
-                            dir -= camR;
+                            dir += camR;  // Q vai para direita (invertido)
                         if (m_inputManager.IsKeyPressed(GLFW_KEY_E))
-                            dir += camR;
+                            dir -= camR;  // E vai para esquerda (invertido)
 
                         // Com RMB, A/D viram strafe (como Q/E). Sem RMB, A/D rodam a câmera (tratado no CameraInputSystem).
                         if (isRMB)
                         {
+                            // Inverte direção de strafe para compensar X=180° pipeline
                             if (m_inputManager.IsKeyPressed(GLFW_KEY_A))
-                                dir -= camR;
+                                dir += camR;  // A vai para direita (invertido)
                             if (m_inputManager.IsKeyPressed(GLFW_KEY_D))
-                                dir += camR;
+                                dir -= camR;  // D vai para esquerda (invertido)
                         }
 
                         // Normaliza com proteção — evita NaN quando W+S / A+D / Q+E cancelam
@@ -162,12 +172,13 @@ namespace Engine
                             mv.isCameraAttachedToPlayer = true;
                         }
 
-                        // Se ACOPLADO → player acompanha yaw da câmera (via componente compartilhado)
+                        // Rotação baseada na câmera (sem Y=180° - causava orientação inversa)
                         if (mv.isCameraAttachedToPlayer)
                         {
                             auto &camInput = world.getComponent<Component::CameraInput>(playerID);
+                            float camYaw = glm::radians(camInput.yaw_degrees);
                             tr.rotation = Engine::Math::Quat(
-                                glm::angleAxis(glm::radians(camInput.yaw_degrees), glm::vec3(0.0f, 1.0f, 0.0f)));
+                                glm::angleAxis(camYaw, glm::vec3(0.0f, 1.0f, 0.0f)));
                         }
                     }
                 }

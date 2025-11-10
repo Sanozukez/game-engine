@@ -71,7 +71,7 @@ void ArmatureRenderer::draw(const Shader& shader,
     // --- NOVO LOG DE DEBUG ---
     // Se vermos este log, TUDO está funcionando e o bug é
     // visual (ex: matriz modelMatrix errada).
-    Engine::Core::Log::Info(std::format("[DEBUG_RENDER] ArmatureRenderer::draw: Desenhando {} linhas.", debugLines.size() / 2));
+    // Engine::Core::Log::Info(std::format("[DEBUG_RENDER] ArmatureRenderer::draw: Desenhando {} linhas.", debugLines.size() / 2));
     // --- FIM DO LOG ---
 
     // 1. Atualiza e Binda os buffers

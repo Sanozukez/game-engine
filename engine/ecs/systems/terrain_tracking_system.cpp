@@ -104,8 +104,14 @@ namespace Engine
                         {
                             float groundHeight = rayOrigin.y - minDistance;
 
-                            // Aplicar a correção: A posição Y do personagem é exatamente a altura do chão.
-                            transform.position.y = groundHeight;
+                            // WORKAROUND: Scale Y=-1 inverte posição Y
+                            // Precisa ajustar com offset para compensar inversão do modelo
+                            if (transform.scale.y < 0.0f) {
+                                // Com Scale negativo, inverte E adiciona offset para subir do chão
+                                transform.position.y = -groundHeight + 1.5f; // +1.5 = altura aproximada do root bone
+                            } else {
+                                transform.position.y = groundHeight;
+                            }
 
                             // NOTA: A variável cameraFocusHeight ainda é usada no PlayerSystem
                             // para o m_camera.setTarget(), o que está correto.
@@ -113,7 +119,6 @@ namespace Engine
                     }
                 }
             }
-
         } // namespace System
     } // namespace ECS
 } // namespace Engine

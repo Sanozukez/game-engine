@@ -17,6 +17,8 @@ namespace Asset {
 class GltfDataReader
 {
 public:
+
+
     // Função principal que carrega os dados de uma primitiva e a adiciona ao Model.
     static std::unique_ptr<Mesh> loadPrimitive(
         const cgltf_primitive* gltfPrimitive,

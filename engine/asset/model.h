@@ -122,6 +122,8 @@ namespace Engine
 
             bool hasSkeleton() const { return m_skeleton != nullptr; }
 
+            const glm::mat4& getNodeGlobalTransform(const std::string& nodeName) const;
+
         private:
             std::vector<std::unique_ptr<Mesh>> m_meshes;
             std::unordered_map<std::string, glm::mat4> m_nodeGlobalTransforms;

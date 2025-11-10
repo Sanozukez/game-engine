@@ -47,9 +47,9 @@ void RenderSystem::update(World &world, float dt)
         std::shared_ptr<Engine::Asset::Model> model = m_assetManager.getModel(mesh.assetID);
 
         // (Log [DEBUG_PTR] do RenderSystem, corrigido para C7595)
-        Engine::Core::Log::Error(std::format("[DEBUG_PTR] RenderSystem: Entidade {} usa Model@0x{:X}",
-                                             static_cast<uint32_t>(entityID),
-                                             reinterpret_cast<uintptr_t>(model.get())));
+        // Engine::Core::Log::Error(std::format("[DEBUG_PTR] RenderSystem: Entidade {} usa Model@0x{:X}",
+        //                                      static_cast<uint32_t>(entityID),
+        //                                      reinterpret_cast<uintptr_t>(model.get())));
 
         // --- PREPARAÇÃO DE ANIMAÇÃO (A CORREÇÃO DE ARQUITETURA e C2039) ---
         const std::vector<glm::mat4> *boneTransformsPtr = nullptr;
@@ -87,13 +87,13 @@ void RenderSystem::update(World &world, float dt)
         // e 'hasSkeleton' (para saber se o Model pode gerar linhas).
         if (boneTransformsPtr != nullptr && model && model->hasSkeleton())
         {
-            Engine::Core::Log::Info("[RENDER_DEBUG] Tentando gerar linhas de debug do esqueleto."); 
+            // Engine::Core::Log::Info("[RENDER_DEBUG] Tentando gerar linhas de debug do esqueleto."); 
             std::vector<glm::vec3> debugLines = model->getSkeletonDebugLines(); 
 
             if (!debugLines.empty())
             {
                 // (Corrigido o log para mostrar o número de LINHAS, não de vértices)
-                Engine::Core::Log::Info(std::format("[RENDER_DEBUG] Geradas {} linhas de debug. Desenhando.", debugLines.size() / 2));
+                // Engine::Core::Log::Info(std::format("[RENDER_DEBUG] Geradas {} linhas de debug. Desenhando.", debugLines.size() / 2));
                 Shader &armatureShader = ShaderManager::Get().getShader(m_assetManager.getAssetIDByName("armature"));
                 glm::mat4 modelMatrix = Engine::Math::getTransformMatrix(transform);
                 

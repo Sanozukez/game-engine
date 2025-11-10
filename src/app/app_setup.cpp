@@ -139,7 +139,22 @@ namespace Engine
 
             // Transform Componente
             world.addComponent<Transform>(playerEntity);
-            world.getComponent<Transform>(playerEntity).position = Engine::Math::Vec3(startPos);
+            auto& playerTransform = world.getComponent<Transform>(playerEntity);
+            
+            // WORKAROUND FINAL: X=180° pipeline inverte Y+Z
+            // Scale Y=-1 + Position Y negativa corrige Y (de ponta cabeça)
+            // Rotation IDENTITY = olhando para frente (câmera alinha depois)
+            glm::vec3 correctedPos = startPos;
+            correctedPos.y = -correctedPos.y;
+            
+            playerTransform.position = Engine::Math::Vec3(correctedPos);
+            playerTransform.rotation = Engine::Math::Quat(glm::identity<glm::quat>()); // IDENTITY = frente
+            playerTransform.scale = Engine::Math::Vec3(1.0f, -1.0f, 1.0f);
+            
+            // LOG: Verificar se rotação foi setada
+            glm::quat rotCheck = playerTransform.rotation;
+            Engine::Core::Log::Info(std::format("[SETUP] Player rotation inicial: w={:.3f} x={:.3f} y={:.3f} z={:.3f}", 
+                rotCheck.w, rotCheck.x, rotCheck.y, rotCheck.z));
 
             // Mesh Componente (CORRIGIDO: Construção explícita)
             Component::Mesh playerMeshConfig{playerAssetID};
@@ -250,20 +265,18 @@ namespace Engine
             ComponentSignature terrainTrackingSignature;
             terrainTrackingSignature.set(typeManager.getTypeID<Transform>());
             terrainTrackingSignature.set(typeManager.getTypeID<TerrainTracker>());
-            // Injeta a altura do raycast no System
+            // REABILITADO com correção para Scale Y=-1
             world.addSystem<TerrainTrackingSystem>(terrainRaycastHeight);
             world.registerSystemSignature<TerrainTrackingSystem>(terrainTrackingSignature);
 
             // --- 3. EXECUÇÃO DE FRAME 0 E SETUP DA CÂMERA (SYNC CRÍTICO) ---
 
-            // 1. Força a correção do Y (TerrainTrackingSystem)
+            // REABILITADO com correção para Scale Y=-1
             TerrainTrackingSystem *terrainSystem = world.getSystem<TerrainTrackingSystem>();
             if (terrainSystem)
             {
                 terrainSystem->update(world, 0.0f);
             }
-
-            
 
             // 2. APLICAÇÃO DE YAW E TARGET (Configuração da Câmera)
             Component::Transform &currentTransform = world.getComponent<Component::Transform>(playerEntity);

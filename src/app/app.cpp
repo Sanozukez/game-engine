@@ -2,7 +2,8 @@
 
 #include "app.h"
 #include "./../../engine/window/window.h"
-#include "./../../engine/core/log.h"
+#include "./../../engine/core/logger.h"  // <-- NOVO: Sistema de log robusto
+#include "./../../engine/core/profiler.h"  // <-- PROFILING
 #include "./../../engine/ecs/world.h"
 
 // Includes de dependências que App::run() precisa para criar e orquestrar
@@ -46,15 +47,43 @@ void App::run()
     Engine::Core::Log::Info("[App] Iniciando aplicação");
 
     // --- CARREGAMENTO DE CONFIGURAÇÃO BASE ---
-    auto &config = Engine::Core::ConfigManager::
-        Get();
+    auto &config = Engine::Core::ConfigManager::Get();
     if (!config.load("config/engine_settings.json"))
     {
         Engine::Core::Log::Critical("[App] Falha ao carregar configurações essenciais. Encerrando.");
         return;
     }
 
-    // === LIGAR LOG DETALHADO ===
+    // === INICIALIZAR SISTEMA DE LOG (via JSON) ===
+    Engine::Core::LoggerConfig logConfig;
+    logConfig.enableConsole = config.getValue<bool>("logging.enable_console", true);
+    logConfig.enableFile = config.getValue<bool>("logging.enable_file", true);
+    logConfig.enableColors = config.getValue<bool>("logging.enable_colors", true);
+    logConfig.asyncMode = config.getValue<bool>("logging.async_mode", true);
+    logConfig.logDirectory = config.getValue<std::string>("logging.directory", "logs");
+    logConfig.logFilePrefix = "game-engine";
+    logConfig.maxFileSizeBytes = config.getValue<int>("logging.max_file_size_mb", 10) * 1024 * 1024;
+    logConfig.maxFileCount = config.getValue<int>("logging.max_file_count", 10);
+    
+    // Nível padrão
+    std::string defaultLevelStr = config.getValue<std::string>("logging.default_level", "Info");
+    if (defaultLevelStr == "Trace") logConfig.defaultLevel = Engine::Core::LogLevel::Trace;
+    else if (defaultLevelStr == "Debug") logConfig.defaultLevel = Engine::Core::LogLevel::Debug;
+    else if (defaultLevelStr == "Info") logConfig.defaultLevel = Engine::Core::LogLevel::Info;
+    else if (defaultLevelStr == "Warn") logConfig.defaultLevel = Engine::Core::LogLevel::Warn;
+    else if (defaultLevelStr == "Error") logConfig.defaultLevel = Engine::Core::LogLevel::Error;
+    else if (defaultLevelStr == "Critical") logConfig.defaultLevel = Engine::Core::LogLevel::Critical;
+    
+    // Níveis por categoria (exemplo: "Render": "Warn")
+    if (config.getValue<std::string>("logging.category_levels.Render", "") == "Warn") {
+        logConfig.categoryLevels["Render"] = Engine::Core::LogLevel::Warn;
+    }
+    
+    Engine::Core::Logger::GetInstance().Initialize(logConfig);
+    
+    Engine::Core::Log::Info("[App] Logger configurado via engine_settings.json");
+
+    // === LIGAR LOG DETALHADO (DESCOMENTE PARA DEBUG) ===
     // Engine::Core::Log::SetLogLevel(Engine::Core::LogLevel::Trace);
     // Engine::Core::Log::Info("[App] Logging set to TRACE");
     
@@ -124,12 +153,17 @@ void App::run()
 
     Engine::Core::Log::Info("[App] Setup completo. Iniciando Game Loop.");
 
+    // === FRAME TIMER PARA PROFILING ===
+    Engine::Core::FrameTimer frameTimer(1.0f); // Log stats a cada 1 segundo
+
     // === LOOP DE RENDERIZAÇÃO ===
     float lastFrame = 0.0f;
     float deltaTime = 0.0f;
 
     while (!m_window->shouldClose())
     {
+        frameTimer.beginFrame(); // <-- PROFILING: Início do frame
+        
         float currentFrame = m_window->getTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
@@ -153,12 +187,26 @@ void App::run()
         }
 
         // MUNDO ECS: Chama a lógica de todos os sistemas
-        m_gameWorld->update(deltaTime);
+        {
+            PROFILE_SCOPE("World::update"); // <-- PROFILING: Tempo total do ECS
+            m_gameWorld->update(deltaTime);
+        }
 
         m_window->swapBuffersAndPollEvents();
+        
+        frameTimer.endFrame(); // <-- PROFILING: Fim do frame
+        
+        // Log stats periodicamente
+        if (frameTimer.shouldLogStats()) {
+            frameTimer.logStats();
+        }
     }
 
     Engine::Core::Log::Info("[App] Encerrando aplicação.");
+    
+    // Shutdown do logger (flush de logs pendentes)
+    Engine::Core::Logger::GetInstance().Shutdown();
+    
     glfwTerminate();
 }
 

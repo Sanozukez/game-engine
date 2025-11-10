@@ -80,7 +80,7 @@ namespace Engine
             Engine::Core::Log::Trace(std::format("GameObject '{}': Modelo definido.", name));
         }
 
-        void GameObject::draw(Engine::Render::Shader &shader) 
+        void GameObject::draw(Engine::Render::Shader &shader)
         {
             // --- LOG DE DEBUG ADICIONADO ---
             glm::mat4 modelMatrix = getTransformMatrix();
@@ -91,15 +91,13 @@ namespace Engine
                 // NOTA: No ECS, essa linha é obsoleta, mas é necessária para a compilação agora.
                 // O Model precisa da matriz Model, View e Projection combinadas!
                 // No entanto, o GameObject não tem acesso às matrizes View/Projection.
- shader.setMat4("uModel", getTransformMatrix());
-
+                shader.setMat4("uModel", getTransformMatrix());
 
                 // Para compilar, vamos passar a Model Matrix como a única matriz disponível,
                 // assumindo que o Model só precisa da parte Model:
 
                 // CORREÇÃO: Chamar o novo Model::draw(Shader&, Matriz)
-                m_model->draw(shader); 
-
+                m_model->draw(shader);
             }
             else
             {

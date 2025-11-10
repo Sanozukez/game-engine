@@ -1,0 +1,75 @@
+{
+  "version": "2.0",
+  "description": "Asset dictionary with animation mappings",
+  "assets": [
+    {
+      "id": 1,
+      "name": "wall_module_placeholder.glb",
+      "type": "Model",
+      "path": "wall_module_placeholder.glb",
+      "description": "Módulo base do muro para array instanciado."
+    },
+    {
+      "id": 2,
+      "name": "character_placeholder.glb",
+      "type": "Model",
+      "path": "character_placeholder.glb",
+      "description": "Modelo de personagem padrão."
+    },
+    {
+      "id": 3,
+      "name": "character_test.glb",
+      "type": "CharacterModel",
+      "path": "character_test.glb",
+      "description": "Modelo de personagem teste com animações.",
+      "skeleton": {
+        "root_bone": "root",
+        "bone_count": 65
+      },
+      "animations": {
+        "idle": {
+          "source_name": "idle",
+          "duration": 2.0,
+          "looping": true,
+          "blend_in": 0.2,
+          "blend_out": 0.2,
+          "priority": 0,
+          "movement_speed": 0.0,
+          "playback_speed": 1.0,
+          "tags": ["locomotion", "idle"]
+        },
+        "walk": {
+          "source_name": "walk",
+          "duration": 0.53,
+          "looping": true,
+          "blend_in": 0.2,
+          "blend_out": 0.2,
+          "priority": 1,
+          "movement_speed": 5.5,
+          "playback_speed": 1.33,
+          "tags": ["locomotion", "movement"]
+        }
+      },
+      "metadata": {
+        "author": "ArtTeam",
+        "date_created": "2025-11-10",
+        "blender_version": "4.0",
+        "exported_fps": 30
+      }
+    },
+    {
+      "id": 4,
+      "name": "TER_Forest_Base.glb",
+      "type": "Model",
+      "path": "test_scene_1.glb",
+      "description": "Malha base do terreno (geometria)."
+    },
+    {
+      "id": 100,
+      "name": "grass_albedo.png",
+      "type": "Texture",
+      "path": "textures/terrain/grass_albedo.png",
+      "description": "Textura PBR Albedo da grama."
+    }
+  ]
+}

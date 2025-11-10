@@ -35,6 +35,11 @@ namespace Engine
                 // Taxa de blend (para animar o blendFactor)
                 float blendSpeed = 5.0f; // Ex: 5.0f/s para transição rápida
 
+                // 3.1 PLAYBACK SPEED
+                // Multiplicador de velocidade de reprodução (1.0f = normal, 1.5f = 50% mais rápido, 0.5f = 50% mais lento)
+                // Usado para casar velocidade da animação com movement_speed (ex: Sprint skill)
+                float playbackSpeed = 1.0f;
+
                 // 4. BONE TRANSFORMS (O RESULTADO FINAL DO SISTEMA)
                 // Vetor que armazena a matriz de transformação final de cada osso (lida pelo Renderer)
                 std::vector<glm::mat4> finalBoneTransforms;

@@ -4,6 +4,9 @@
 // e a arquitetura SRP (Escreve resultados no Componente).
 
 #include "animation_system.h"
+#include "../../animation/animation_config.h"
+#include "../../animation/forward_kinematics.h"
+#include "../../animation/pose_utils.h"
 #include "../world.h"
 #include "../components/transform_component.h"
 #include "../components/movement_component.h"
@@ -14,11 +17,16 @@
 #include "../../animation/keyframe_sampler.h"
 #include "../../animation/skeleton_hierarchy.h"
 #include "../../core/log.h"
+#include "../../core/profiler.h"  // <-- PROFILING
 #include "../../asset/model.h"
+#include "../../math/transform_utils.h"
 
 #include <glm/gtx/matrix_decompose.hpp> // para glm::decompose
 #include <glm/gtc/matrix_transform.hpp> // para glm::translate/scale
+#include <glm/gtc/quaternion.hpp>
+
 #include <glm/gtx/norm.hpp>
+#include <cmath> // std::fabs
 #include <format>
 #include <map>
 #include <stdexcept>
@@ -28,164 +36,366 @@
 using namespace Engine::ECS;
 using namespace Engine::ECS::System;
 
-// --- ADICIONADO: Helpers (que estavam em animation_utils) ---
-// (No futuro, isto vai para PoseBlender.cpp, como planeámos)
-static void decomposeTRS(const glm::mat4 &m, glm::vec3 &T, glm::quat &R, glm::vec3 &S)
-{
-    glm::vec3 skew;
-    glm::vec4 persp;
-    glm::decompose(m, S, R, T, skew, persp);
-    R = glm::normalize(R);
-}
-static glm::mat4 composeTRS(const glm::vec3 &T, const glm::quat &R, const glm::vec3 &S)
-{
-    glm::mat4 M(1.0f);
-    M = glm::translate(M, T);
-    M *= glm::mat4_cast(R);
-    M = glm::scale(M, S);
-    return M;
-}
-// --- FIM DOS HELPERS ---
-
-AnimationSystem::AnimationSystem(Engine::Asset::AssetManager &assetManager)
+// Atualizar o construtor para corresponder à declaração no .h
+AnimationSystem::AnimationSystem(Engine::Asset::AssetManager& assetManager)
     : m_assetManager(assetManager)
 {
+    m_config.useRestPoseOnly = false;
+    m_config.disableScaleKeys = true;
 }
 
-void AnimationSystem::update(World &world, float dt)
+void AnimationSystem::playAnimation(Component::AnimationComponent& animComp, uint32_t newAnimationID, float blendDuration)
 {
-    if (m_entities.empty())
-    {
+    // Se já está tocando essa animação, não fazer nada
+    if (animComp.currentAnimationID == newAnimationID && animComp.blendFactor >= 1.0f) {
         return;
     }
 
-    for (const EntityID entityID : m_entities)
-    {
-        // 1. OBTER COMPONENTES (Usando nomes completos)
-        Engine::ECS::Component::AnimationComponent &animComp = world.getComponent<Engine::ECS::Component::AnimationComponent>(entityID);
-        Engine::ECS::Component::Mesh &meshComp = world.getComponent<Engine::ECS::Component::Mesh>(entityID);
+    // Configurar transição
+    animComp.previousAnimationID = animComp.currentAnimationID;
+    animComp.currentAnimationID = newAnimationID;
+    animComp.currentTime = 0.0f; // Resetar tempo para nova animação
+    animComp.blendFactor = 0.0f; // Começar do início da transição
+    animComp.blendSpeed = (blendDuration > 0.0f) ? (1.0f / blendDuration) : 1000.0f; // Blend speed em 1/s
+}
 
-        std::shared_ptr<Engine::Asset::Model> model = m_assetManager.getModel(meshComp.assetID);
+void AnimationSystem::update(World& world, float dt)
+{
+    PROFILE_SCOPE("AnimationSystem::update"); // <-- PROFILING
+    
+    if (m_entities.empty()) {
+        return;
+    }
 
-        // (Log [DEBUG_PTR])
-        Engine::Core::Log::Error(std::format("[DEBUG_PTR] AnimationSystem: Entidade {} usa Model@0x{:X}",
-                                             static_cast<uint32_t>(entityID),
-                                             reinterpret_cast<uintptr_t>(model.get())));
+    for (const EntityID entityID : m_entities) {
+        updateEntityAnimation(world, entityID, dt);
+    }
+}
 
-        // 2. OBTER ESQUELETO E ASSET DE ANIMAÇÃO
-        Engine::Skeleton *skeleton = model->getSkeleton();
+void AnimationSystem::updateEntityAnimation(World& world, EntityID entityID, float dt)
+{
+    // Obter componentes
+    auto& animComp = world.getComponent<Component::AnimationComponent>(entityID);
+    auto& meshComp = world.getComponent<Component::Mesh>(entityID);
 
-        // --- CORREÇÃO: Usa AnimationAsset ---
-        const Engine::Asset::AnimationAsset *currentAnim = model->getAnimation(animComp.currentAnimationID);
+    std::shared_ptr<Engine::Asset::Model> model = m_assetManager.getModel(meshComp.assetID);
+    Engine::Skeleton* skeleton = model ? model->getSkeleton() : nullptr;
+    const Engine::Asset::AnimationAsset* currentAnim = 
+        model ? model->getAnimation(animComp.currentAnimationID) : nullptr;
 
-        // 3. VERIFICAÇÃO DE SEGURANÇA
-        if (!skeleton || !currentAnim)
-        {
-            continue;
-        }
+    // Validar inputs
+    if (!validateAnimationInputs(skeleton, currentAnim)) {
+        return;
+    }
 
-        // 4. ATUALIZAR TEMPO (no Componente)
-        animComp.currentTime += dt * currentAnim->ticksPerSecond;
-        float duration = currentAnim->duration;
-        if (duration > 0.0f)
-        {
-            animComp.currentTime = std::fmod(animComp.currentTime, duration);
-        }
+    // Atualizar blend factor (transição entre animações)
+    updateBlendFactor(animComp, dt);
 
-        // 5. PASSO 1 (Rest Pose)
-        std::map<int, glm::mat4> boneFinalLocalTransforms;
-        for (const auto &bone : skeleton->bones)
-        {
-            glm::mat4 restPoseTransform = model->getNodeLocalTransform(bone.name);
-            if (bone.id == skeleton->rootNodeId)
-            {
-                Engine::Core::Log::Info(std::format("[ANIM_DEBUG] Rest Pose T (Root): ({:.2f}, {:.2f}, {:.2f})",
-                                                    restPoseTransform[3].x, restPoseTransform[3].y, restPoseTransform[3].z));
-            }
-            boneFinalLocalTransforms[bone.id] = restPoseTransform;
-        }
+    // Atualizar tempo de animação
+    updateAnimationTime(animComp, currentAnim, dt);
 
-        // 6. PASSO 2 (Override da Animação)
-        // --- ESTA É A LÓGICA CORRETA (que impede o colapso) ---
-        for (const auto &pair : currentAnim->channels)
-        {
-            const Engine::Asset::AnimationChannel &channel = pair.second;
-            if (channel.boneId == -1)
-                continue;
+    std::map<int, glm::mat4> boneFinalLocalTransforms;
 
-            // 1. Obter a Rest Pose (do Passo 5)
-            // (Esta é a nossa base, ex: T(0, 0.68, 0))
-            glm::mat4 restPoseTransform = boneFinalLocalTransforms[channel.boneId];
+    // Se estamos em transição (blending), interpolar entre previous e current
+    if (animComp.blendFactor < 1.0f && animComp.previousAnimationID != 0) {
+        const Engine::Asset::AnimationAsset* previousAnim = 
+            model->getAnimation(animComp.previousAnimationID);
+        
+        if (previousAnim) {
+            blendAnimations(skeleton, model, animComp, currentAnim, previousAnim, boneFinalLocalTransforms);
+        } else {
+            // Se previous animation inválida, usar apenas current
+            initializeNodeTransforms(skeleton, model, boneFinalLocalTransforms);
+            if (!m_config.useRestPoseOnly) {
+                for (const auto& pair : currentAnim->channels) {
+                    const auto& channel = pair.second;
+                    if (channel.boneId == -1) continue;
 
-            // 2. Decompô-la em T, R, S
-            glm::vec3 restT, restS;
-            glm::quat restR;
-            decomposeTRS(restPoseTransform, restT, restR, restS);
-
-            // 3. Definir os valores base como a Rest Pose
-            glm::vec3 T = restT;
-            glm::quat R = restR;
-            glm::vec3 S = restS;
-
-            size_t indexA, indexB;
-            float progress;
-
-            // 4. Sobrescrever T, R, S APENAS se o canal de animação existir
-            if (!channel.positionKeys.empty())
-            {
-                // (O seu 'animation_utils' antigo tinha uma lógica 'isRoot' aqui.
-                // Vamos omiti-la por agora, mas ela pode ser a causa
-                // da "animação bugada" se o seu 'root' tiver T=0)
-                progress = KeyframeSampler::findKeyframePairAndGetProgress(channel, animComp.currentTime, indexA, indexB);
-                T = KeyframeSampler::interpolateTranslation(channel, progress, indexA, indexB);
-            }
-
-            if (!channel.rotationKeys.empty())
-            {
-                progress = KeyframeSampler::findKeyframePairAndGetProgress(channel, animComp.currentTime, indexA, indexB);
-                R = KeyframeSampler::interpolateRotation(channel, progress, indexA, indexB);
-            }
-
-            if (!channel.scaleKeys.empty())
-            {
-                progress = KeyframeSampler::findKeyframePairAndGetProgress(channel, animComp.currentTime, indexA, indexB);
-                S = KeyframeSampler::interpolateScale(channel, progress, indexA, indexB);
-            }
-
-            // 5. Compor a matriz final (ex: T(rest), R(anim), S(rest))
-            glm::mat4 localTransform = composeTRS(T, R, S);
-
-            // 6. Salvar a matriz final no mapa
-            boneFinalLocalTransforms[channel.boneId] = localTransform;
-
-            if (channel.boneId == 0)
-            {
-                Engine::Core::Log::Info(std::format("[DEBUG_SYS] Root (ID 0) LocalTransform Sendo Usada: T({:.2f}, {:.2f}, {:.2f}), S({:.2f}, {:.2f}, {:.2f})",
-                                                    T.x, T.y, T.z, S.x, S.y, S.z));
+                    glm::mat4 nodeTransform = boneFinalLocalTransforms[channel.boneId];
+                    glm::mat4 animatedTransform;
+                    
+                    applyAnimationChannel(channel, nodeTransform, animComp.currentTime, animatedTransform);
+                    boneFinalLocalTransforms[channel.boneId] = animatedTransform;
+                }
             }
         }
-        // --- FIM DA LÓGICA CORRETA ---
+    } else {
+        // Sem blending - apenas current animation
+        initializeNodeTransforms(skeleton, model, boneFinalLocalTransforms);
 
-        // 7. PASSO 3 (Cinemática Forward)
+        if (!m_config.useRestPoseOnly) {
+            for (const auto& pair : currentAnim->channels) {
+                const auto& channel = pair.second;
+                if (channel.boneId == -1) continue;
 
-        const glm::mat4 identityTransform = glm::mat4(1.0f);
-
-        SkeletonHierarchy::traverseAndCalculateFinalTransforms(
-            *skeleton,
-            boneFinalLocalTransforms,
-            identityTransform);
-
-        // 8. COPIA OS RESULTADOS PARA O COMPONENTE (A CORREÇÃO SRP)
-        skeleton->getFinalBoneTransforms(animComp.finalBoneTransforms);
-
-        // 9. Debug (Logs mantidos)
-        if (skeleton->rootNodeId != -1)
-        {
-            const Engine::Bone &root = skeleton->bones[skeleton->rootNodeId];
-            Engine::Core::Log::Info(std::format("[ANIM_DEBUG] Root ({}) Final T: ({:.2f}, {:.2f}, {:.2f})",
-                                                root.name, root.finalTransformation[3].x, root.finalTransformation[3].y, root.finalTransformation[3].z));
-            Engine::Core::Log::Info(std::format("[ANIM_DEBUG] Root ({}) IBM T: ({:.2f}, {:.2f}, {:.2f})",
-                                                root.name, root.inverseBindMatrix[3].x, root.inverseBindMatrix[3].y, root.inverseBindMatrix[3].z));
+                glm::mat4 nodeTransform = boneFinalLocalTransforms[channel.boneId];
+                glm::mat4 animatedTransform;
+                
+                applyAnimationChannel(channel, nodeTransform, animComp.currentTime, animatedTransform);
+                boneFinalLocalTransforms[channel.boneId] = animatedTransform;
+            }
         }
+    }
+
+    // Atualizar transformações dos ossos
+    updateBoneTransforms(skeleton, boneFinalLocalTransforms, animComp);
+}
+
+void AnimationSystem::updateAnimationTime(
+    Component::AnimationComponent& animComp,
+    const Engine::Asset::AnimationAsset* currentAnim,
+    float dt)
+{
+    if (!currentAnim) return;
+
+    // GLTF usa SEGUNDOS diretamente, não ticks!
+    // duration e keyframe times já estão em segundos
+    // Aplica playbackSpeed para controlar velocidade de reprodução (ex: Sprint = 1.5x)
+    animComp.currentTime += dt * animComp.playbackSpeed;
+    float duration = currentAnim->duration;
+    
+    if (duration > 0.0f) {
+        animComp.currentTime = std::fmod(animComp.currentTime, duration);
+    }
+}
+
+void AnimationSystem::initializeNodeTransforms(
+    const Engine::Skeleton* skeleton,
+    const std::shared_ptr<Engine::Asset::Model>& model,
+    std::map<int, glm::mat4>& outLocalTransforms)
+{
+    if (!skeleton || !model) return;
+
+    // PIPELINE DE IMPORTAÇÃO: Correção aplicada nos dados, não no runtime
+    // Node transforms já corrigidos durante carregamento
+    for (const auto& bone : skeleton->bones) {
+        glm::mat4 nodeTransform = model->getNodeLocalTransform(bone.name);
+        
+        // CORREÇÃO JÁ APLICADA em animation_data_mapper.cpp - não duplicar!
+        // A rest pose vem pura, mas keyframes já têm X=180° aplicado
+        outLocalTransforms[bone.id] = nodeTransform;
+    }
+}
+
+void AnimationSystem::applyAnimationChannel(
+    const Engine::Asset::AnimationChannel& channel,
+    const glm::mat4& nodeTransform,
+    float currentTime,
+    glm::mat4& outLocalTransform)
+{
+    // Decompor node transform original como fallback
+    glm::vec3 nodeT, nodeS;
+    glm::quat nodeR;
+    Engine::Animation::decomposeTRS(nodeTransform, nodeT, nodeR, nodeS);
+
+    // GLTF: Começar com node transform, keyframes sobrescrevem componentes específicos
+    glm::vec3 T = nodeT;
+    glm::quat R = nodeR;
+    glm::vec3 S = nodeS;
+
+    size_t indexA = 0, indexB = 0;
+    float progress = 0.0f;
+
+    // Se tem keyframes de posição, usar animação (senão, manter node transform)
+    if (!channel.positionKeys.empty()) {
+        progress = Engine::KeyframeSampler::findKeyframePairAndGetProgress(
+            channel, currentTime, indexA, indexB);
+        T = Engine::KeyframeSampler::interpolateTranslation(
+            channel, progress, indexA, indexB);
+        T = Engine::Animation::sanitizeVector3(T, nodeT);
+    }
+
+    // Se tem keyframes de rotação, usar animação (senão, manter node transform)
+    if (!channel.rotationKeys.empty()) {
+        progress = Engine::KeyframeSampler::findKeyframePairAndGetProgress(
+            channel, currentTime, indexA, indexB);
+        R = Engine::KeyframeSampler::interpolateRotation(
+            channel, progress, indexA, indexB);
+        R = Engine::Animation::sanitizeQuaternion(R, nodeR);
+        
+        // Log rotation for bone 1
+        // if (channel.boneId == 1) {
+        //     Engine::Core::Log::Info(std::format(
+        //         "[ANIM_CHANNEL] Bone {} rotation from anim: R(w:{:.3f},x:{:.3f},y:{:.3f},z:{:.3f})",
+        //         channel.boneId, R.w, R.x, R.y, R.z));
+        // }
+    }
+
+    // Se tem keyframes de escala, usar animação (senão, manter node transform)
+    if (!channel.scaleKeys.empty() && !m_config.disableScaleKeys) {
+        progress = Engine::KeyframeSampler::findKeyframePairAndGetProgress(
+            channel, currentTime, indexA, indexB);
+        S = Engine::KeyframeSampler::interpolateScale(
+            channel, progress, indexA, indexB);
+        S = Engine::Animation::sanitizeScale(S);
+    }
+
+    outLocalTransform = Engine::Animation::composeTRS(T, R, S);
+}
+
+void AnimationSystem::updateBoneTransforms(
+    const Engine::Skeleton* skeleton,
+    const std::map<int, glm::mat4>& localTransforms,
+    Component::AnimationComponent& animComp)
+{
+    if (!skeleton) return;
+
+    const size_t numBones = skeleton->bones.size();
+    if (numBones == 0) return;
+
+    std::vector<glm::mat4> globalTransforms;
+    Engine::Animation::ForwardKinematics::computeGlobalTransforms(
+        skeleton,
+        localTransforms,
+        globalTransforms
+    );
+
+    // Log após FK (SEM correção global - mantém hierarquia)
+    for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+        const auto& bone = skeleton->bones[i];
+        
+        if (i < 3) {
+            glm::vec3 T, S;
+            glm::quat R;
+            // Engine::Animation::decomposeTRS(globalTransforms[i], T, R, S);
+            // Engine::Core::Log::Info(std::format(
+            //     "[FK_RESULT] Bone '{}' (ID:{}) - T({:.3f}, {:.3f}, {:.3f})",
+            //     bone.name, bone.id, T.x, T.y, T.z));
+        }
+    }
+
+    for (size_t i = 0; i < numBones; ++i) {
+        const Engine::Bone& bone = skeleton->bones[i];
+        const int jointIndex = (bone.jointIndex >= 0) ? 
+            bone.jointIndex : static_cast<int>(i);
+
+        if (static_cast<size_t>(jointIndex) >= animComp.finalBoneTransforms.size()) {
+            animComp.finalBoneTransforms.resize(jointIndex + 1, glm::mat4(1.0f));
+        }
+
+        // A correção de orientação já foi aplicada nos keyframes em animation_data_mapper.cpp (Local Space)
+        // Não aplicar mais correções aqui - deixar para o World Space (Transform da entidade)
+        glm::mat4 correctedGlobal = globalTransforms[i];
+        
+        // Para a mesh: aplicar IBM na transformação global
+        glm::mat4 finalTransform = correctedGlobal * bone.inverseBindMatrix;
+        animComp.finalBoneTransforms[jointIndex] = finalTransform;
+        
+        // Para o debug skeleton: usar a transformação corrigida SEM IBM (espaço mundial)
+        Engine::Bone& mutableBone = const_cast<Engine::Bone&>(bone);
+        mutableBone.finalTransformation = correctedGlobal;
+    }
+
+    if (m_config.debug.showFKDebug && skeleton->rootNodeId != -1) {
+        const auto& root = skeleton->bones[skeleton->rootNodeId];
+        const glm::vec3 t = glm::vec3(root.finalTransformation[3]);
+        Engine::Core::Log::Info(std::format(
+            "[FK_DBG] Root '{}' final position: ({:.3f}, {:.3f}, {:.3f})",
+            root.name, t.x, t.y, t.z));
+    }
+}
+
+bool AnimationSystem::validateAnimationInputs(
+    const Engine::Skeleton* skeleton,
+    const Engine::Asset::AnimationAsset* currentAnim) const
+{
+    if (!skeleton) {
+        if (m_config.validateInputs) {
+            Engine::Core::Log::Error("[AnimSystem] Invalid skeleton");
+        }
+        return false;
+    }
+
+    if (!currentAnim) {
+        if (m_config.validateInputs) {
+            Engine::Core::Log::Error("[AnimSystem] Invalid animation asset");
+        }
+        return false;
+    }
+
+    if (skeleton->bones.empty()) {
+        if (m_config.validateInputs) {
+            Engine::Core::Log::Error("[AnimSystem] Skeleton has no bones");
+        }
+        return false;
+    }
+
+    return true;
+}
+
+void AnimationSystem::updateBlendFactor(Component::AnimationComponent& animComp, float dt)
+{
+    if (animComp.blendFactor < 1.0f) {
+        animComp.blendFactor += dt * animComp.blendSpeed;
+        if (animComp.blendFactor >= 1.0f) {
+            animComp.blendFactor = 1.0f;
+            animComp.previousAnimationID = 0; // Transição completa
+        }
+    }
+}
+
+void AnimationSystem::blendAnimations(
+    const Engine::Skeleton* skeleton,
+    const std::shared_ptr<Engine::Asset::Model>& model,
+    Component::AnimationComponent& animComp,
+    const Engine::Asset::AnimationAsset* currentAnim,
+    const Engine::Asset::AnimationAsset* previousAnim,
+    std::map<int, glm::mat4>& outBlendedTransforms)
+{
+    if (!skeleton || !model || !currentAnim || !previousAnim) return;
+
+    // Calcular transforms para animação anterior (em seu tempo atual)
+    std::map<int, glm::mat4> previousTransforms;
+    initializeNodeTransforms(skeleton, model, previousTransforms);
+    
+    if (!m_config.useRestPoseOnly) {
+        for (const auto& pair : previousAnim->channels) {
+            const auto& channel = pair.second;
+            if (channel.boneId == -1) continue;
+
+            glm::mat4 nodeTransform = previousTransforms[channel.boneId];
+            glm::mat4 animatedTransform;
+            
+            // Usar o tempo atual da animação (já está progredindo)
+            applyAnimationChannel(channel, nodeTransform, animComp.currentTime, animatedTransform);
+            previousTransforms[channel.boneId] = animatedTransform;
+        }
+    }
+
+    // Calcular transforms para animação atual
+    std::map<int, glm::mat4> currentTransforms;
+    initializeNodeTransforms(skeleton, model, currentTransforms);
+    
+    if (!m_config.useRestPoseOnly) {
+        for (const auto& pair : currentAnim->channels) {
+            const auto& channel = pair.second;
+            if (channel.boneId == -1) continue;
+
+            glm::mat4 nodeTransform = currentTransforms[channel.boneId];
+            glm::mat4 animatedTransform;
+            
+            applyAnimationChannel(channel, nodeTransform, animComp.currentTime, animatedTransform);
+            currentTransforms[channel.boneId] = animatedTransform;
+        }
+    }
+
+    // Interpolar entre previous e current usando blendFactor
+    for (const auto& bone : skeleton->bones) {
+        glm::vec3 prevT, prevS, currT, currS;
+        glm::quat prevR, currR;
+        
+        // Decompor previous
+        Engine::Animation::decomposeTRS(previousTransforms[bone.id], prevT, prevR, prevS);
+        
+        // Decompor current
+        Engine::Animation::decomposeTRS(currentTransforms[bone.id], currT, currR, currS);
+        
+        // Interpolar (blendFactor: 0.0 = 100% previous, 1.0 = 100% current)
+        glm::vec3 blendedT = glm::mix(prevT, currT, animComp.blendFactor);
+        glm::quat blendedR = glm::slerp(prevR, currR, animComp.blendFactor);
+        glm::vec3 blendedS = glm::mix(prevS, currS, animComp.blendFactor);
+        
+        // Recompor matriz
+        outBlendedTransforms[bone.id] = Engine::Animation::composeTRS(blendedT, blendedR, blendedS);
     }
 }

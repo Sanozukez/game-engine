@@ -1,39 +1,68 @@
-// // engine/ecs/systems/animation_system.h
+// engine/ecs/systems/animation_system.h
+
 #pragma once
-
 #include "base_system.h"
-#include "../../ecs/world.h"
-#include "../../asset/asset_manager.h" // Dependência para buscar dados de animação
+#include "../../animation/animation_config.h"
+#include "../../asset/asset_manager.h"
+#include "../../asset/skeleton.h"
+#include "../../asset/animation.h"
+#include "../components/animation_component.h"
+#include "../../animation/keyframe_sampler.h"  // Adicionando include necessário
+#include "../world.h"
+#include <glm/glm.hpp>
+#include <map>
 
-// Forward declarations dos Componentes
-namespace Engine::ECS::Component
-{
-    struct Animation;
-    struct Movement;
-    struct Transform;
-}
+namespace Engine::ECS::System {
 
-namespace Engine
-{
-    namespace ECS
-    {
-        namespace System
-        {
-            // O AnimationSystem tem a responsabilidade única de traduzir o estado de movimento 
-            // em transformações de ossos (Bones).
-            class AnimationSystem : public BaseSystem
-            {
-            private:
-                Engine::Asset::AssetManager& m_assetManager;
+class AnimationSystem : public BaseSystem {
+public:
+    explicit AnimationSystem(Engine::Asset::AssetManager& assetManager);
+    void update(World& world, float dt) override;
+    
+    // Método público para trocar animações com blending
+    void playAnimation(Component::AnimationComponent& animComp, uint32_t newAnimationID, float blendDuration = 0.3f);
 
-            public:
-                // O construtor injeta o AssetManager (DIP)
-                AnimationSystem(Engine::Asset::AssetManager &assetManager);
-                
-                // O update executa a lógica de cálculo de frames e blend.
-                void update(World &world, float dt) override;
-            };
+private:
+    Engine::Asset::AssetManager& m_assetManager;
+    Engine::Animation::AnimationConfig m_config;
 
-        } // namespace System
-    } // namespace ECS
-} // namespace Engine
+    void updateEntityAnimation(World& world, EntityID entityID, float dt);
+
+    void updateAnimationTime(
+        Component::AnimationComponent& animComp,
+        const Engine::Asset::AnimationAsset* currentAnim,
+        float dt);
+
+    void initializeNodeTransforms(
+        const Engine::Skeleton* skeleton,
+        const std::shared_ptr<Engine::Asset::Model>& model,
+        std::map<int, glm::mat4>& outLocalTransforms);
+
+    void applyAnimationChannel(
+        const Engine::Asset::AnimationChannel& channel,
+        const glm::mat4& nodeTransform,
+        float currentTime,
+        glm::mat4& outLocalTransform);
+
+    void updateBoneTransforms(
+        const Engine::Skeleton* skeleton,
+        const std::map<int, glm::mat4>& localTransforms,
+        Component::AnimationComponent& animComp);
+    
+    // Blending entre animações
+    void updateBlendFactor(Component::AnimationComponent& animComp, float dt);
+    
+    void blendAnimations(
+        const Engine::Skeleton* skeleton,
+        const std::shared_ptr<Engine::Asset::Model>& model,
+        Component::AnimationComponent& animComp,
+        const Engine::Asset::AnimationAsset* currentAnim,
+        const Engine::Asset::AnimationAsset* previousAnim,
+        std::map<int, glm::mat4>& outBlendedTransforms);
+
+    bool validateAnimationInputs(
+        const Engine::Skeleton* skeleton,
+        const Engine::Asset::AnimationAsset* currentAnim) const;
+};
+
+} // namespace Engine::ECS::System

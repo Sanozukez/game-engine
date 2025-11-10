@@ -27,32 +27,31 @@ uniform mat4 uBoneTransforms[MAX_BONES];
 
 void main()
 {
-    mat4 skin = mat4(1.0);
+    vec4 pos;
+    vec3 normal;
+    
     if (uIsAnimated) {
-        skin  = aWeights.x * uBoneTransforms[aBoneIDs.x];
+        // Skinning: aplica as transformações dos bones aos vértices
+        mat4 skin  = aWeights.x * uBoneTransforms[aBoneIDs.x];
         skin += aWeights.y * uBoneTransforms[aBoneIDs.y];
         skin += aWeights.z * uBoneTransforms[aBoneIDs.z];
         skin += aWeights.w * uBoneTransforms[aBoneIDs.w];
-    }
-    
-   mat4 M;
-    if (uIsAnimated) { 
-        // Se for animado, 'skin' (uBoneTransforms) já contém
-        // a transformação completa relativa ao uModel.
-        // O uNode (transform do nó da mesh no glTF) NÃO deve ser usado.     
-        M = uModel * skin;        
+        
+        pos = skin * vec4(aPos, 1.0);
+        normal = mat3(skin) * aNormal;
     } else {
-        // Se NÃO for animado (malha estática), aplicamos o uNode.
-        // 'skin' é mat4(1.0) neste caso (definido acima).
-        M = uModel * uNode * skin; 
+        pos = vec4(aPos, 1.0);
+        normal = aNormal;
     }
 
-    vec4 worldPos = M * vec4(aPos, 1.0);
+    // Transformações de espaço: Model space -> World space
+    mat4 M = uModel * uNode;
+    vec4 worldPos = M * pos;
     FragPos = worldPos.xyz;
 
-    // normal: usar inverse-transpose de M sem translação
+    // Normal em world space
     mat3 N = mat3(transpose(inverse(M)));
-    Normal = normalize(N * aNormal);
+    Normal = normalize(N * normal);
 
     TexCoords = aTexCoords;
 

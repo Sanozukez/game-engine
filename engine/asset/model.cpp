@@ -229,21 +229,35 @@ namespace Engine
 
         void Model::draw(Engine::Render::Shader &shader, const std::vector<glm::mat4> *boneTransforms)
         {
-            if (boneTransforms != nullptr)
-            {
-                // --- CORREÇÃO (SRP): Usa Skeleton::MAX_BONES em vez de AnimationComponent ---
-                for (size_t i = 0; i < boneTransforms->size() && i < Skeleton::MAX_BONES; ++i)
-                {
-                    std::string uniformName = "uBoneTransforms[" + std::to_string(i) + "]";
-                    shader.setMat4(uniformName, boneTransforms->at(i));
-                }
-            }
+
+            // 🔧 flag de teste rápida
+            static bool TEST_BONES_ARE_SKIN_IN_MODELSPACE = true; // ← deixe true no experimento 1
+
+            // Desenha cada mesh com sua própria uNode
             for (const auto &mesh_ptr : m_meshes)
             {
+                const glm::mat4 nodeGlobal = mesh_ptr->getNodeTransform(); // agora é GLOBAL
+                shader.setMat4("uNode", nodeGlobal);
+                // LOG: uNode realmente usado
+                // Engine::Core::Log::Info(std::format(
+                //     "[NODE_DBG] uNode(global).T=({:.3f},{:.3f},{:.3f})",
+                //     nodeGlobal[3].x, nodeGlobal[3].y, nodeGlobal[3].z));
+
+                if (boneTransforms != nullptr)
+                {
+                    // Passa as transformações dos ossos diretamente, sem converter para espaço do mesh
+                    // As transformações já devem estar no espaço correto do modelo
+                    const size_t count = std::min(boneTransforms->size(), static_cast<size_t>(Skeleton::MAX_BONES));
+                    for (size_t i = 0; i < count; ++i)
+                    {
+                        const glm::mat4& jointGlobal = (*boneTransforms)[i];
+                        shader.setMat4("uBoneTransforms[" + std::to_string(i) + "]", jointGlobal);
+                    }
+                }
+
                 mesh_ptr->draw(shader);
             }
         }
-
         // Implementação da função clone() para Model
         std::unique_ptr<Model> Model::clone() const
         {
@@ -274,40 +288,43 @@ namespace Engine
             m_nodeGlobalTransforms[nodeName] = transform;
         }
 
+        const glm::mat4 &Model::getNodeGlobalTransform(const std::string &nodeName) const
+        {
+            static const glm::mat4 kIdentity(1.0f);
+            auto it = m_nodeGlobalTransforms.find(nodeName);
+            if (it != m_nodeGlobalTransforms.end())
+                return it->second;
+            return kIdentity;
+        }
+
         // IMPLEMENTAÇÃO DE getSkeletonDebugLines
         std::vector<glm::vec3> Model::getSkeletonDebugLines() const
-        {
+{
+    std::vector<glm::vec3> lines;
+    if (!m_skeleton) return lines;
 
-            std::vector<glm::vec3> lines;
-            if (!m_skeleton || m_skeleton->bones.empty())
-            {
-                return lines;
-            }
+    const auto &bones = m_skeleton->bones;
+    lines.reserve(bones.size() * 2);
 
-            int lineCount = 0;
-            // O cálculo é: MatrizGlobal = MatrizFinal * (IBM^-1)
-            for (const auto &bone : m_skeleton->bones)
-            {
-                // Se o bone não tem pai, é o root. Pulamos para desenhar apenas as conexões.
-                if (bone.parentId == -1 || bone.parentId >= m_skeleton->bones.size())
-                {
-                    continue;
-                }
+    for (const auto &b : bones)
+    {
+        if (b.parentId < 0 || b.parentId >= (int)bones.size())
+            continue;
 
-                const Bone &parentBone = m_skeleton->bones[bone.parentId];
+        // Usar finalTransformation que contém as transformações globais (após FK)
+        // mas ANTES do IBM (espaço mundial)
+        const glm::mat4 &Gparent = bones[b.parentId].finalTransformation;
+        const glm::mat4 &Gchild  = bones[b.id].finalTransformation;
 
-                // 1. Matriz Global do Bone
-                glm::vec3 bonePosition = glm::vec3(bone.debug_GlobalTransform[3]);
-                glm::vec3 parentPosition = glm::vec3(parentBone.debug_GlobalTransform[3]);
-                // 2. Adicionar a linha (Ponto A e Ponto B)
-                lines.push_back(parentPosition);
-                lines.push_back(bonePosition);
-                lineCount++;
-            }
-            // --- NOVO LOG DE DEBUG ---
-            Engine::Core::Log::Info(std::format("[DEBUG_MODEL] getSkeletonDebugLines: Geradas {} linhas de debug ({} vértices).", lineCount, lines.size()));
-            return lines;
-        }
+        const glm::vec3 p = glm::vec3(Gparent[3]); // posição global do pai
+        const glm::vec3 c = glm::vec3(Gchild[3]);  // posição global do filho
+
+        lines.push_back(p);
+        lines.push_back(c);
+    }
+
+    return lines;
+}
 
     } // namespace Asset
 } // namespace Engine

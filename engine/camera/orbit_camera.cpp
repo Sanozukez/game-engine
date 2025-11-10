@@ -84,8 +84,8 @@ namespace Engine
 
         glm::vec3 OrbitCamera::getForwardVector() const
         {
-            // direções no plano XZ (niveladas), úteis para strafe do target
-            return glm::normalize(glm::vec3(std::sin(m_yawRad), 0.0f, std::cos(m_yawRad)));
+            // CORRIGIDO: Right-Handed (compatível com glm::lookAt) - frente é -Z
+            return glm::normalize(glm::vec3(std::sin(m_yawRad), 0.0f, -std::cos(m_yawRad)));
         }
 
         glm::vec3 OrbitCamera::getRightVector() const

@@ -27,7 +27,7 @@
       "camera_focus_height": 1.2,
       "start_position": [
         0.0,
-        50.0,
+        0.0,
         0.0
       ]
     }
@@ -67,6 +67,18 @@
         "fragment_path": "engine/shaders/armature.frag"
       }
     ]
+  },
+  "logging": {
+    "directory": "logs",
+    "max_file_size_mb": 10,
+    "max_file_count": 10,
+    "enable_console": true,
+    "enable_file": true,
+    "enable_colors": true,
+    "async_mode": true,
+    "default_level": "Info",
+    "category_levels": {
+      "Render": "Warn"
+    }
   }
-  
 }

@@ -5,14 +5,16 @@
 target_sources(engine
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/path_utils.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/logger.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/config_manager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/scene_node_fetcher.cpp
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/path_utils.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/log.h       
+        ${CMAKE_CURRENT_SOURCE_DIR}/log.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/logger.h
         ${CMAKE_CURRENT_SOURCE_DIR}/config_manager.h
         ${CMAKE_CURRENT_SOURCE_DIR}/scene_node_fetcher.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/profiler.h
 )
 
 # Adiciona o diretório 'core' como uma diretiva de inclusão pública para o target 'engine'.
