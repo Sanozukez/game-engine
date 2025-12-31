@@ -122,10 +122,6 @@ namespace Engine
             glm::vec3 startPos = config.getValue<glm::vec3>("character.player.start_position", glm::vec3(0.0f, 50.0f, 0.0f));
             const uint32_t playerAssetID = assetManager.getAssetIDByName(playerModelName);
 
-            // NOVO: Lê o nome do clipe IDLE (ou usa um fallback)
-            std::string idleClipName = "idle";                                         // Nome padrão do seu clipe no Blender/GLTF
-            const uint32_t IDLE_CLIP_ID = assetManager.getAssetIDByName(idleClipName); // Resolve o Hash ID
-
             if (playerAssetID == 0)
             {
                 Log::Critical(std::format("[Setup] Falha ao resolver Asset ID para: {}. Player não será criado.", playerModelName));
@@ -168,9 +164,9 @@ namespace Engine
             Component::AnimationComponent playerAnimConfig;
             playerAnimConfig.animationAssetID = playerAssetID;
 
-            // GATILHO CRÍTICO: Inicia a animação IDLE
-            playerAnimConfig.currentAnimationID = IDLE_CLIP_ID;
-            playerAnimConfig.previousAnimationID = IDLE_CLIP_ID;
+            // v101: Não configurar currentAnimationID manualmente - será setado pelo playAnimationByName()
+            playerAnimConfig.currentAnimationID = 0; // Será sobrescrito
+            playerAnimConfig.previousAnimationID = 0;
 
             // ** CORREÇÃO FINAL: Forçar o blendFactor a ser 1.0f (totalmente visível) **
             playerAnimConfig.blendFactor = 1.0f;
@@ -240,6 +236,30 @@ namespace Engine
             animationSignature.set(typeManager.getTypeID<Engine::ECS::Component::AnimationComponent>());
             world.addSystem<AnimationSystem>(assetManager);
             world.registerSystemSignature<AnimationSystem>(animationSignature);
+            
+            // =========================================================================
+            // TESTE v101: playAnimationByName com metadata do asset dictionary
+            // =========================================================================
+            Engine::Core::Log::Info("[TEST v101] Iniciando teste de playAnimationByName...");
+            
+            // Obter referências necessárias
+            auto* animationSystem = world.getSystem<AnimationSystem>();
+            auto& playerAnimComp = world.getComponent<Engine::ECS::Component::AnimationComponent>(playerEntity);
+            auto playerModel = assetManager.getModel(playerAssetID);
+            
+            if (animationSystem && playerModel) {
+                // TESTAR: Tocar animação "idle" usando metadata do asset dictionary
+                animationSystem->playAnimationByName(playerAnimComp, playerModel, "idle");
+                Engine::Core::Log::Info("[TEST v101] playAnimationByName('idle') chamado com sucesso!");
+            } else {
+                if (!animationSystem) {
+                    Engine::Core::Log::Error("[TEST v101] AnimationSystem não encontrado!");
+                }
+                if (!playerModel) {
+                    Engine::Core::Log::Error("[TEST v101] Player model não carregado!");
+                }
+            }
+            // =========================================================================
             
             // -- RENDER SYSTEM --
             ComponentSignature renderSignature;

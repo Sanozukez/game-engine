@@ -15,11 +15,18 @@ namespace Engine::ECS::Component
     struct Movement;
     struct Player;
     struct Transform;
+    struct AnimationComponent;
+    struct Mesh;
 }
 // Forward declarations de outras dependências
 namespace Engine::Asset
 {
     class Model;
+    class AssetManager;
+}
+namespace Engine::ECS::System
+{
+    class AnimationSystem;
 }
 namespace Engine::Physics
 {
@@ -41,13 +48,17 @@ namespace Engine
                 Engine::Input::InputManager &m_inputManager;
                 
                 // REINTRODUZIDO: Referência à Câmera principal (para Forward/Right e setYaw)
-                Engine::Camera::ICamera &m_camera; 
+                Engine::Camera::ICamera &m_camera;
+                
+                // NOVO v101: Ponteiro para AnimationSystem (resolvido em runtime)
+                AnimationSystem* m_animationSystem; // Ponteiro, será resolvido no update
 
             public:
                 // O construtor injeta a Câmera como dependência.
                 PlayerSystem(Engine::Camera::ICamera &camera) 
                     : m_inputManager(Engine::Input::InputManager::Get()),
-                      m_camera(camera) // Inicializa a referência da câmera
+                      m_camera(camera), // Inicializa a referência da câmera
+                      m_animationSystem(nullptr)
                 {
                 }
                 

@@ -1,12 +1,16 @@
 // engine/ecs/systems/player_system.cpp
 
 #include "player_system.h"
+#include "animation_system.h"
 #include "../../core/log.h"
 #include "../../ecs/world.h"
 #include "../../ecs/components/movement_component.h"
 #include "../../ecs/components/player_component.h"
 #include "../../ecs/components/transform_component.h"
 #include "../../ecs/components/camera_input_component.h"
+#include "../../ecs/components/animation_component.h"
+#include "../../ecs/components/mesh_component.h"
+#include "../../asset/asset_manager.h"
 #include "../../math/quat.h"
 #include <glm/gtx/quaternion.hpp>
 #include <GLFW/glfw3.h>
@@ -27,6 +31,39 @@ namespace Engine
                 const EntityID playerID = *m_entities.begin();
                 auto &mv = world.getComponent<Component::Movement>(playerID);
                 auto &tr = world.getComponent<Component::Transform>(playerID);
+
+                // NOVO v101: Obter AnimationSystem na primeira execução
+                if (!m_animationSystem) {
+                    m_animationSystem = world.getSystem<AnimationSystem>();
+                }
+
+                // NOVO v101: Detecção de W para trocar animação idle/walk
+                bool w = m_inputManager.IsKeyPressed(GLFW_KEY_W);
+                
+                if (m_animationSystem) {
+                    auto& animComp = world.getComponent<Component::AnimationComponent>(playerID);
+                    auto& meshComp = world.getComponent<Component::Mesh>(playerID);
+                    auto& assetManager = Engine::Asset::AssetManager::Get();
+                    auto playerModel = assetManager.getModel(meshComp.assetID);
+                    
+                    if (playerModel) {
+                        if (w) {
+                            // W pressionado → walk
+                            std::hash<std::string> hasher;
+                            uint32_t walkHash = static_cast<uint32_t>(hasher("walk"));
+                            if (animComp.currentAnimationID != walkHash) {
+                                m_animationSystem->playAnimationByName(animComp, playerModel, "walk");
+                            }
+                        } else {
+                            // W não pressionado → idle
+                            std::hash<std::string> hasher;
+                            uint32_t idleHash = static_cast<uint32_t>(hasher("idle"));
+                            if (animComp.currentAnimationID != idleHash) {
+                                m_animationSystem->playAnimationByName(animComp, playerModel, "idle");
+                            }
+                        }
+                    }
+                }
 
                 const float vel = mv.movementSpeed * dt;
                 const float yawSpeed = mv.rotationSpeed * dt;
