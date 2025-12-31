@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base_system.h"
+#include "ecs/systems/base_system.h"
 #include <limits>                 // Para std::numeric_limits
 #include <optional>               // <--- CORREÇÃO 1: Incluir o header para std::optional
 #include <glm/glm.hpp>            // <--- CORREÇÃO 2: Incluir o header para glm::vec3

@@ -2,10 +2,10 @@
 
 #pragma once
 
-#include "base_system.h"
-#include "../../../client/render/renderer.h"
-#include "../../../client/render/armature_renderer.h" // Incluído para a instância
-#include "../../asset/asset_manager.h"      // Necessário para o membro m_assetManager
+#include "ecs/systems/base_system.h"
+#include "client/render/renderer.h"
+#include "client/render/armature_renderer.h" // Incluído para a instância
+#include "engine/asset/asset_manager.h"      // Necessário para o membro m_assetManager
 #include "../components/transform_component.h"
 #include "../components/animation_component.h" // Para usar Component::Animation
 #include "../components/mesh_component.h"      // Para usar Component::Mesh

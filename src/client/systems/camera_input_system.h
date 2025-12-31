@@ -1,16 +1,16 @@
 // engine/ecs/systems/camera_input_system.h
 #pragma once
 
-#include "base_system.h"
+#include "ecs/systems/base_system.h"
 #include "../world.h"
-#include "../../../client/camera/icamera.h"
-#include "../../../client/input/input_manager.h"
-#include "../../../client/input/input_service.h" // declara IKeyboardListener/IMouseListener/...
-#include "../../../client/input/i_mouse_look.h"  // Engine::Input::MouseLook
-#include "../../../client/input/i_keyboard_listener.h"
-#include "../../../client/input/i_mouse_listener.h"
-#include "../../../client/input/i_scroll_listener.h"
-#include "../../../client/input/i_mouse_button_listener.h"
+#include "client/camera/icamera.h"
+#include "client/input/input_manager.h"
+#include "client/input/input_service.h" // declara IKeyboardListener/IMouseListener/...
+#include "client/input/i_mouse_look.h"  // Engine::Input::MouseLook
+#include "client/input/i_keyboard_listener.h"
+#include "client/input/i_mouse_listener.h"
+#include "client/input/i_scroll_listener.h"
+#include "client/input/i_mouse_button_listener.h"
 
 
 namespace Engine

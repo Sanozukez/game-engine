@@ -11,16 +11,31 @@ add_executable(game-engine
     app/app.h
     app/app_setup.cpp
     app/app_setup.h
+    
+    # Game-specific Systems (depend on graphics)
+    systems/render_system.cpp
+    systems/render_system.h
+    systems/player_system.cpp
+    systems/player_system.h
+    systems/camera_system.cpp
+    systems/camera_system.h
+    systems/camera_input_system.cpp
+    systems/camera_input_system.h
+    systems/camera_target_system.h
+    systems/terrain_tracking_system.cpp
+    systems/terrain_tracking_system.h
 )
 
 target_include_directories(game-engine PRIVATE
-    ${CMAKE_SOURCE_DIR}/engine
-    ${CMAKE_SOURCE_DIR}/client
+    ${CMAKE_SOURCE_DIR}               # Root: allows engine/..., client/..., src/...
+    ${CMAKE_SOURCE_DIR}/engine        # Allows ecs/..., core/..., etc
+    ${CMAKE_SOURCE_DIR}/client        # Allows render/..., camera/..., etc
+    ${CMAKE_SOURCE_DIR}/src/client    # Allows systems/..., app/...
 )
 
 target_link_libraries(game-engine PRIVATE
-    engine           # Core (ECS, Asset, Animation)
-    engine_client    # Graphics, Input, UI
+    engine_client    # Graphics, Input, UI (depends on engine)
+    engine           # Core (ECS, Asset, Animation) - MUST BE AFTER client
 )
 
 target_compile_features(game-engine PRIVATE cxx_std_20)

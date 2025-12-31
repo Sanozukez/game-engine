@@ -1,13 +1,13 @@
 #include "terrain_tracking_system.h"
-#include "../../ecs/world.h"
-#include "../../ecs/components/transform_component.h"
-#include "../../ecs/components/terrain_component.h"
-#include "../../ecs/components/mesh_component.h"
-#include "../../ecs/components/terrain_tracker_component.h"
-#include "../../ecs/components/movement_component.h"
-#include "../../asset/asset_manager.h"
-#include "../../asset/model.h"
-#include "../../physics/raycaster.h"
+#include "ecs/world.h"
+#include "ecs/components/transform_component.h"
+#include "ecs/components/terrain_component.h"
+#include "ecs/components/mesh_component.h"
+#include "ecs/components/terrain_tracker_component.h"
+#include "ecs/components/movement_component.h"
+#include "asset/asset_manager.h"
+#include "asset/model.h"
+#include "physics/raycaster.h"
 
 #include <glm/glm.hpp>
 

@@ -1,9 +1,9 @@
-// engine/ECS/systems/camera_targe_system.h
+// src/client/systems/camera_target_system.h
 
 #pragma once
 
-#include "base_system.h"
-#include "../../../client/camera/icamera.h"
+#include "ecs/systems/base_system.h"
+#include "client/camera/icamera.h"
 
 // Forward Declarations
 namespace Engine::ECS::Component {

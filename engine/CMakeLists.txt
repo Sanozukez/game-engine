@@ -14,6 +14,7 @@ target_include_directories(engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/ecs/components
     ${CMAKE_CURRENT_SOURCE_DIR}/ecs/systems
     ${CMAKE_CURRENT_SOURCE_DIR}/camera
+    ${CMAKE_SOURCE_DIR}/client  # ADDED: Allow ECS systems to include client headers
 )
 
 # Adiciona subdiretórios.
@@ -41,9 +42,7 @@ add_subdirectory(ecs)     # <--- ONDE PlayerSystem e RenderSystem são definidos
 target_compile_features(engine PUBLIC cxx_std_20)
 
 # Linka com as bibliotecas de terceiros.
+# REMOVED: glfw, glad, imgui (now handled by engine_client)
 target_link_libraries(engine PUBLIC
-    glad   # AGORA É APENAS 'glad', não 'glad::glad'
-    glm    # 'glm' é o nome do target, como antes
-    imgui  # AGORA É APENAS 'imgui', não 'ImGui::ImGui'
-    glfw   # Adicionado GLFW, pois ImGui liga com ele, e a engine pode precisar
+    glm    # Math library only
 )

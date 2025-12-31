@@ -2,20 +2,20 @@
 
 #include "player_system.h"
 #include "animation_system.h"
-#include "../../core/log.h"
-#include "../../ecs/world.h"
-#include "../../ecs/components/movement_component.h"
-#include "../../ecs/components/player_component.h"
-#include "../../ecs/components/transform_component.h"
-#include "../../ecs/components/camera_input_component.h"
-#include "../../ecs/components/animation_component.h"
-#include "../../ecs/components/mesh_component.h"
-#include "../../asset/asset_manager.h"
-#include "../../math/quat.h"
+#include "core/log.h"
+#include "ecs/world.h"
+#include "ecs/components/movement_component.h"
+#include "ecs/components/player_component.h"
+#include "ecs/components/transform_component.h"
+#include "ecs/components/camera_input_component.h"
+#include "ecs/components/animation_component.h"
+#include "ecs/components/mesh_component.h"
+#include "asset/asset_manager.h"
+#include "math/quat.h"
 #include <glm/gtx/quaternion.hpp>
 #include <GLFW/glfw3.h>
 #include <cmath>
-#include "../../../client/camera/camera_math.h"
+#include "camera/camera_math.h"
 
 namespace Engine
 {
