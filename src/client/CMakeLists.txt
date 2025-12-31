@@ -57,22 +57,36 @@ add_custom_command(TARGET game-engine POST_BUILD
 )
 
 # ============================================================================
-# EDITOR - Visual editor (Unity/Unreal-like) - FUTURE
+# EDITOR - Visual editor (Unity/Unreal-like)
 # ============================================================================
 
-# Uncomment when ready to implement editor
-# add_executable(game-editor
-#     editor/editor_main.cpp
-#     editor/editor_app.cpp
-#     editor/panels/scene_hierarchy_panel.cpp
-#     editor/panels/inspector_panel.cpp
-#     editor/panels/asset_browser_panel.cpp
-#     editor/panels/viewport_panel.cpp
-#     editor/tools/gizmo_system.cpp
-# )
-# 
-# target_link_libraries(game-editor PRIVATE
-#     engine
-#     engine_client
-#     engine_editor  # Editor-specific systems
-# )
+add_executable(game-editor
+    ../editor/editor_main.cpp
+    ../editor/editor_app.cpp
+    ../editor/editor_app.h
+)
+
+target_include_directories(game-editor PRIVATE
+    ${CMAKE_SOURCE_DIR}               # Root
+    ${CMAKE_SOURCE_DIR}/engine        # Permite ecs/..., core/..., etc
+    ${CMAKE_SOURCE_DIR}/client        # Permite render/..., camera/..., etc
+    ${CMAKE_SOURCE_DIR}/src/editor    # Permite includes do editor
+)
+
+target_link_libraries(game-editor PRIVATE
+    engine_client    # Graphics, Input, UI
+    engine           # Core (ECS, Asset, Animation)
+)
+
+target_compile_features(game-editor PRIVATE cxx_std_20)
+
+# Copy assets to editor build directory
+add_custom_command(TARGET game-editor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/config
+        $<TARGET_FILE_DIR:game-editor>/config
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/data
+        $<TARGET_FILE_DIR:game-editor>/data
+    COMMENT "Copiando configurações para o editor..."
+)
