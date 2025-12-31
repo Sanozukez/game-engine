@@ -15,7 +15,7 @@
 #include <glm/gtx/quaternion.hpp>
 #include <GLFW/glfw3.h>
 #include <cmath>
-#include "../../camera/camera_math.h"
+#include "../../../client/camera/camera_math.h"
 
 namespace Engine
 {

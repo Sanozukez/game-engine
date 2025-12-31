@@ -1,7 +1,7 @@
 // // engine/render/armature_renderer.cpp
 #include "armature_renderer.h"
 #include "opengl_types.h"
-#include "../core/log.h"
+#include "../../engine/core/log.h"
 #include <format>
 
 namespace Engine {

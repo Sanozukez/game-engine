@@ -4,14 +4,14 @@
 
 #include "render_system.h"
 #include "../../ecs/world.h"
-#include "../../render/shader_manager.h" 
+#include "../../../client/render/shader_manager.h" 
 #include "../components/transform_component.h"
 #include "../components/animation_component.h" // <-- Inclui AnimationComponent
 #include "../components/mesh_component.h" 
 #include "../../asset/model.h"
 #include "../../math/transform_utils.h"
 #include "../../asset/skeleton.h" 
-#include "../../render/armature_renderer.h" // (Necessário para m_armatureRenderer)
+#include "../../../client/render/armature_renderer.h" // (Necessário para m_armatureRenderer)
 
 #include <glm/glm.hpp>
 #include <memory>

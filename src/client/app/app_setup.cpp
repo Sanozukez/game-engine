@@ -1,6 +1,6 @@
 // // engine/core/app_setup.cpp
 
-#include "../../client/render/opengl_types.h"
+#include "../../../client/render/opengl_types.h"
 #include "app_setup.h"
 #include "./../../core/log.h"
 #include "./../../ecs/systems/player_system.h"
@@ -8,18 +8,18 @@
 #include "./../../ecs/systems/terrain_tracking_system.h"
 #include "./../../ecs/systems/render_system.h"
 #include "./../../ecs/world_loader.h" // Incluir o WorldLoader diretamente
-#include "./../../client/input/input_service.h"
+#include "../../../client/input/input_service.h"
 #include "./../../ecs/components/all_components.h" // Incluir todos os componentes
 #include "./../../ecs/components/component_signature.h"
-#include "./../../client/camera/orbit_camera.h"
+#include "../../../client/camera/orbit_camera.h"
 #include "./../../ecs/components/camera_input_component.h"
 #include "./../../engine/core/config_manager.h" // Importar para acessar o JSON
 #include "./../../engine/asset/asset_manager.h"
-#include "./../../client/render/shader_manager.h"
+#include "../../../client/render/shader_manager.h"
 
-#include "./../../client/input/i_keyboard_listener.h"
-#include "./../../client/input/i_mouse_listener.h"
-#include "./../../client/input/i_scroll_listener.h"
+#include "../../../client/input/i_keyboard_listener.h"
+#include "../../../client/input/i_mouse_listener.h"
+#include "../../../client/input/i_scroll_listener.h"
 #include "./../../ecs/systems/camera_input_system.h"
 
 #include <glm/gtx/string_cast.hpp>

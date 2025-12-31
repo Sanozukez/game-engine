@@ -6,7 +6,7 @@
 #include <sstream>                  // Para stringstream
 #include <stdexcept>                // Para exceções
 #include <unordered_map>            // Para otimização de vértices
-#include "./../../engine/render/material.h" // Para material padrão (nullptr)
+#include "./../../client/render/material.h" // Para material padrão (nullptr)
 
 // Estruturas auxiliares para parsing (dentro do .cpp para não poluir o .h)
 struct ObjVertex {

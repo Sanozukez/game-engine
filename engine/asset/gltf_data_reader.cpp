@@ -3,8 +3,8 @@
 #include "model.h"
 #include "../core/log.h"
 #include "../deps/cgltf/cgltf.h"
-#include "../render/material.h"
-#include "../render/texture.h"
+#include "../../client/render/material.h"
+#include "../../client/render/texture.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>

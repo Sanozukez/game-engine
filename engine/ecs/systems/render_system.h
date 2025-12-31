@@ -3,8 +3,8 @@
 #pragma once
 
 #include "base_system.h"
-#include "../../render/renderer.h"
-#include "../../render/armature_renderer.h" // Incluído para a instância
+#include "../../../client/render/renderer.h"
+#include "../../../client/render/armature_renderer.h" // Incluído para a instância
 #include "../../asset/asset_manager.h"      // Necessário para o membro m_assetManager
 #include "../components/transform_component.h"
 #include "../components/animation_component.h" // Para usar Component::Animation

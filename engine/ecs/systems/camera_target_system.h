@@ -3,7 +3,7 @@
 #pragma once
 
 #include "base_system.h"
-#include "../../camera/icamera.h"
+#include "../../../client/camera/icamera.h"
 
 // Forward Declarations
 namespace Engine::ECS::Component {

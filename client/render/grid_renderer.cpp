@@ -1,4 +1,5 @@
 #include "grid_renderer.h"
+#include "opengl_types.h"
 #include <glm/glm.hpp>
 #include <vector>
 

@@ -1,17 +1,17 @@
 // // src/app/app.cpp
 
 #include "app.h"
-#include "./../../client/window/window.h"
+#include "../../../client/window/window.h"
 #include "./../../engine/core/logger.h"  // <-- NOVO: Sistema de log robusto
 #include "./../../engine/core/profiler.h"  // <-- PROFILING
 #include "./../../engine/ecs/world.h"
 
 // Includes de dependências que App::run() precisa para criar e orquestrar
-#include "./../../client/camera/free_camera.h"
-#include "./../../client/camera/orbit_camera.h"
-#include "./../../client/render/renderer.h"
+#include "../../../client/camera/free_camera.h"
+#include "../../../client/camera/orbit_camera.h"
+#include "../../../client/render/renderer.h"
 #include "./../../engine/core/config_manager.h"
-#include "./../../client/input/input_manager.h"
+#include "../../../client/input/input_manager.h"
 
 // NOVO: Inclui a classe AppSetup, que contém toda a lógica de inicialização
 #include "app_setup.h"

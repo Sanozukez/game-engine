@@ -4,8 +4,8 @@
 #pragma once
 
 #include "base_system.h"
-#include "./../../camera/icamera.h"
-#include "../../input/input_manager.h" // Dependência da sua lógica de input
+#include "../../../client/camera/icamera.h"
+#include "../../../client/input/input_manager.h" // Dependência da sua lógica de input
 
 namespace Engine {
 namespace ECS {

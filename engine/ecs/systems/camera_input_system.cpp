@@ -6,8 +6,8 @@
 #include "../../ecs/components/movement_component.h"
 #include "../../ecs/components/player_component.h"
 #include "../../ecs/components/camera_input_component.h"
-#include "../../camera/orbit_camera.h"
-#include "../../camera/free_camera.h"
+#include "../../../client/camera/orbit_camera.h"
+#include "../../../client/camera/free_camera.h"
 #include <GLFW/glfw3.h>
 #include <format>
 

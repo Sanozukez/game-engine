@@ -3,9 +3,9 @@
 #include "camera_system.h"
 #include "../../core/config_manager.h"
 #include "../../core/log.h"
-#include "../../camera/free_camera.h"
-#include "../../camera/orbit_camera.h"
-#include "../../input/input_manager.h"
+#include "../../../client/camera/free_camera.h"
+#include "../../../client/camera/orbit_camera.h"
+#include "../../../client/input/input_manager.h"
 #include "../../ecs/world.h"
 #include <GLFW/glfw3.h>
 

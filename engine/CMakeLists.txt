@@ -20,11 +20,8 @@ target_include_directories(engine PUBLIC
 # A ordem aqui é importante para dependências de targets (ex: core antes de quem o usa).
 add_subdirectory(core)
 add_subdirectory(math) # Requerido por Vec3/Quat
-add_subdirectory(window)
-add_subdirectory(camera)
-add_subdirectory(input)
+# REMOVIDOS: window, camera, input, render (movidos para client/)
 add_subdirectory(animation)
-add_subdirectory(render)
 add_subdirectory(geometry)
 add_subdirectory(asset)
 add_subdirectory(deps)

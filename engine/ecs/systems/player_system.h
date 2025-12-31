@@ -3,8 +3,8 @@
 #pragma once
 
 #include "base_system.h"
-#include "../../camera/icamera.h" // Necessário para a dependência
-#include "../../input/input_manager.h"
+#include "../../../client/camera/icamera.h" // Necessário para a dependência
+#include "../../../client/input/input_manager.h"
 #include "../../core/config_manager.h" 
 #include <optional>
 #include <glm/glm.hpp> // Necessário para a assinatura da função rayTriangleIntersect

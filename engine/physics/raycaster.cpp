@@ -1,9 +1,9 @@
 // engine/physics/raycaster.cpp
 #define GLFW_INCLUDE_NONE // Evitar reinclusão de headers do OpenGL
 #include "raycaster.h"
-#include "./../../engine/camera/icamera.h"
+#include "./../../client/camera/icamera.h"
 #include <glm/gtc/matrix_inverse.hpp>
-#include "../../camera/camera_math.h"
+#include "../../client/camera/camera_math.h"
 #include <glm/gtx/norm.hpp>
 
 namespace Engine

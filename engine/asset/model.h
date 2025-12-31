@@ -8,7 +8,7 @@
 #include <string>
 #include <memory>
 #include <glm/glm.hpp>
-#include "./../../engine/render/material.h"
+#include "./../../client/render/material.h"
 #include "./../../engine/math/quat.h"
 #include "./../../engine/core/log.h"
 #include <format>
