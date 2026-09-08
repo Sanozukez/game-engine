@@ -1,0 +1,7 @@
+scene_name: StarterScene
+scene_type: starter
+ground_size: 50
+ground_center: 0,0,0
+player_spawn: 0,1,0
+npc_spawn: 12,1,6
+terrain_source: project/terrains/default_terrain

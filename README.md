@@ -185,6 +185,31 @@ Lista de emoji
 
 ### Compile e Run
 
+## Quando a compilação passar, o comando para rodar é:
+
+
+# Abrir ambiente do Visual Studio 2022
+
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
+
+# Configurar projeto
+
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -B build -G "Visual Studio 17 2022"
+
+# Jogo principal
+
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build --config Debug --target game-engine
+.\build\src\client\Debug\game-engine.exe
+
+# Editor
+
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build --config Debug --target game-engine-editor
+.\build\src\client\Debug\game-engine-editor.exe
+
+
+
+.\build\Debug\game-engine.exe
+
 cmake -B build
 cmake --build build
 cd build/src/Debug

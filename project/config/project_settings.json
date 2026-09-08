@@ -1,0 +1,17 @@
+{
+  "project": {
+    "name": "StarterGameProject",
+    "default_scene": "scenes/starter_scene.scene",
+    "terrains_folder": "terrains",
+    "assets_folder": "assets",
+    "scenes_folder": "scenes",
+    "startup_terrain_size": 50.0
+  },
+  "scene": {
+    "type": "starter",
+    "ground_size": 50.0,
+    "ground_height": 0.0,
+    "player_spawn": [0.0, 1.0, 0.0],
+    "npc_spawn": [12.0, 1.0, 6.0]
+  }
+}

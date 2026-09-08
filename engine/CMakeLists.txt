@@ -10,11 +10,12 @@ add_library(engine STATIC)
 target_include_directories(engine PUBLIC
     ${json_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/math 
-    ${CMAKE_CURRENT_SOURCE_SOURCE_DIR}/ecs
+    ${CMAKE_CURRENT_SOURCE_DIR}/ecs
     ${CMAKE_CURRENT_SOURCE_DIR}/ecs/components
     ${CMAKE_CURRENT_SOURCE_DIR}/ecs/systems
     ${CMAKE_CURRENT_SOURCE_DIR}/camera
     ${CMAKE_SOURCE_DIR}/client  # ADDED: Allow ECS systems to include client headers
+    ${glad_SOURCE_DIR}/include
 )
 
 # Adiciona subdiretórios.
@@ -45,4 +46,5 @@ target_compile_features(engine PUBLIC cxx_std_20)
 # REMOVED: glfw, glad, imgui (now handled by engine_client)
 target_link_libraries(engine PUBLIC
     glm    # Math library only
+    glad   # OpenGL loader headers and implementation for engine sources
 )
