@@ -1,8 +1,8 @@
 // engine/asset/model.cpp
 #include "model.h"
 #include "./../core/log.h"
-#include "./../render/shader.h"
-#include "../render/opengl_types.h"
+#include "./../../client/render/shader.h"
+#include "../../client/render/opengl_types.h"
 #include "../ecs/components/component_signature.h"
 #include <cstddef>
 #include <format>

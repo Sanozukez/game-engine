@@ -89,7 +89,11 @@ void AnimationSystem::playAnimationByName(Component::AnimationComponent& animCom
             // Último fallback: primeira animação disponível
             if (model->getAnimationCount() > 0) {
                 Engine::Core::Log::Warn("'idle' também não encontrado! Usando primeira animação disponível.");
-                playAnimation(animComp, 0, 0.2f);
+                
+                // Pegar o hash da primeira animação do map
+                // NOTA: Como m_animations é privado, vamos tentar buscar pelo nome que sabemos existir
+                // Por enquanto, vamos logar o erro e retornar
+                Engine::Core::Log::Error("FALLBACK CRÍTICO: Nenhuma animação nomeada corretamente! Verifique o asset dictionary.");
                 return;
             } else {
                 Engine::Core::Log::Error("Model não tem NENHUMA animação! Impossível tocar animação.");
@@ -112,14 +116,14 @@ void AnimationSystem::playAnimationByName(Component::AnimationComponent& animCom
     }
 
     // 4. Aplicar metadata do AnimationMapping
-    uint32_t animID = model->getAnimationIndex(mapping->source_name);
+    uint32_t animHash = static_cast<uint32_t>(hasher(mapping->source_name)); // Usar HASH, não índice
     float blendTime = mapping->blend_in_time;
     
     // Atualizar playbackSpeed do componente (será usado no update)
     animComp.playbackSpeed = mapping->default_playback_speed;
     
     // 5. Iniciar animação com blend configurado
-    playAnimation(animComp, animID, blendTime);
+    playAnimation(animComp, animHash, blendTime);
     
     Engine::Core::Log::Info(std::format("Tocando animação: '{}' -> '{}' (speed: {:.2f}, blend: {:.2f}s)", 
                                         engineName, mapping->source_name, 

@@ -28,12 +28,18 @@ endforeach()
 
 include(cmake/dependencies.cmake)
 
-# Primeiro, adicione o diretório do motor.
-# Isso deve vir antes de 'src' porque 'src' linka com 'engine'.
+# ============================================================================
+# BUILD ORDER - Dependencies matter!
+# ============================================================================
+
+# 1. Core Engine (shared: ECS, Asset, Animation, Physics)
 add_subdirectory(engine)
 
-# Depois, adicione o diretório da aplicação/executável.
+# 2. Client Library (graphics: Render, Input, UI, Camera)
+add_subdirectory(client)
+
+# 3. Executables (game client, editor, server)
 add_subdirectory(src)
 
-# Adicionar testes (opcional, validação de structs etc.)
+# 4. Tests (optional: struct validation, unit tests)
 add_subdirectory(tests)

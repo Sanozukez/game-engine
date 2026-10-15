@@ -10,21 +10,20 @@ add_library(engine STATIC)
 target_include_directories(engine PUBLIC
     ${json_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/math 
-    ${CMAKE_CURRENT_SOURCE_SOURCE_DIR}/ecs
+    ${CMAKE_CURRENT_SOURCE_DIR}/ecs
     ${CMAKE_CURRENT_SOURCE_DIR}/ecs/components
     ${CMAKE_CURRENT_SOURCE_DIR}/ecs/systems
     ${CMAKE_CURRENT_SOURCE_DIR}/camera
+    ${CMAKE_SOURCE_DIR}/client  # ADDED: Allow ECS systems to include client headers
+    ${glad_SOURCE_DIR}/include
 )
 
 # Adiciona subdiretórios.
 # A ordem aqui é importante para dependências de targets (ex: core antes de quem o usa).
 add_subdirectory(core)
 add_subdirectory(math) # Requerido por Vec3/Quat
-add_subdirectory(window)
-add_subdirectory(camera)
-add_subdirectory(input)
+# REMOVIDOS: window, camera, input, render (movidos para client/)
 add_subdirectory(animation)
-add_subdirectory(render)
 add_subdirectory(geometry)
 add_subdirectory(asset)
 add_subdirectory(deps)
@@ -44,9 +43,8 @@ add_subdirectory(ecs)     # <--- ONDE PlayerSystem e RenderSystem são definidos
 target_compile_features(engine PUBLIC cxx_std_20)
 
 # Linka com as bibliotecas de terceiros.
+# REMOVED: glfw, glad, imgui (now handled by engine_client)
 target_link_libraries(engine PUBLIC
-    glad   # AGORA É APENAS 'glad', não 'glad::glad'
-    glm    # 'glm' é o nome do target, como antes
-    imgui  # AGORA É APENAS 'imgui', não 'ImGui::ImGui'
-    glfw   # Adicionado GLFW, pois ImGui liga com ele, e a engine pode precisar
+    glm    # Math library only
+    glad   # OpenGL loader headers and implementation for engine sources
 )

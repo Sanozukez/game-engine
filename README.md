@@ -97,25 +97,27 @@ game-engine/
 ├── imgui.ini       # Arquivo de configuração salvo pelo ImGui
 └── README.md
 ```
+
 🚀 Como compilar
+
 1. Clone o projeto
-bash
-Copiar
-Editar
-git clone https://github.com/seu-usuario/game-engine.git
-cd game-engine
+   bash
+   Copiar
+   Editar
+   git clone https://github.com/seu-usuario/game-engine.git
+   cd game-engine
 2. Configure com CMake
-css
-Copiar
-Editar
-cmake -S . -B build
+   css
+   Copiar
+   Editar
+   cmake -S . -B build
 3. Compile
-css
-Copiar
-Editar
-cmake --build build
-O executável será gerado em:
-build/src/Debug/game-engine.exe
+   css
+   Copiar
+   Editar
+   cmake --build build
+   O executável será gerado em:
+   build/src/Debug/game-engine.exe
 
 🧰 Stack Utilizada
 C++17
@@ -151,48 +153,69 @@ Flexível para expansão: Pode adicionar novos módulos ou testes criando outras
 
  Separar lógica da GUI e lógica de renderização
 
- # Comandos Rápidos
+# Comandos Rápidos
 
- ### GIT
+### GIT
 
  git status
  git add .
 
  git commit -m "descrição curta" -m "descrição longa"
+
 <!-- :emoji: <tipo>(escopo): <descrição> -->
 
  git push
 
+Lista de tipo
+fix
+feat
+docs
+refactor
+build
 
-Lista de tipo  
-fix <!-- bugfix -->
-feat <!-- novo recurso -->
-docs <!-- documentação -->
-refactor <!-- refatoração -->
-build <!-- alterações de revisão de código -->
+Lista de emoji
+🐛
+✨
+📚
+🚧
+➕
+👌
+♻️
+🚚
 
-Lista de emoji  
-:bug: <!-- bugfix -->
-:sparkles: <!-- novo recurso -->
-:books: <!-- documentação -->
-:construction: <!-- em progresso -->
-:heavy_plus_sign: <!-- add dependencia -->
-:ok_hand: <!-- alterações de revisão de código -->
-:recycle: <!-- refatoração -->
-:truck: <!-- mover/renomear -->
+### Compile e Run
+
+## Quando a compilação passar, o comando para rodar é:
 
 
+# Abrir ambiente do Visual Studio 2022
 
- ### Compile e Run
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
 
+# Configurar projeto
+
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -B build -G "Visual Studio 17 2022"
+
+# Jogo principal
+
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build --config Debug --target game-engine
+.\build\src\client\Debug\game-engine.exe
+
+# Editor
+
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build --config Debug --target game-engine-editor
+.\build\src\client\Debug\game-engine-editor.exe
+
+
+
+.\build\Debug\game-engine.exe
 
 cmake -B build
 cmake --build build
 cd build/src/Debug
-./game-engine.exe  
+./game-engine.exe
 
 #define GLFW_INCLUDE_NONE
-
 
 "character": {
     "player": {

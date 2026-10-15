@@ -14,10 +14,10 @@ namespace Engine
         // Caminho do executável
         auto execPath = std::filesystem::current_path();
 
-        // Sobe até o root do projeto (assumindo estrutura de build em build/src/Debug)
-        // Cuidado: Isso ainda é frágil se a estrutura de build mudar.
-        // Uma variável de ambiente ou parâmetro de linha de comando seria mais robusto.
-        auto projectRoot = execPath.parent_path().parent_path().parent_path();
+        // Sobe até o root do projeto
+        // OLD: build/src/Debug -> 3 níveis
+        // NEW: build/src/client/Debug -> 4 níveis
+        auto projectRoot = execPath.parent_path().parent_path().parent_path().parent_path();
 
         auto fullPath = projectRoot / relativePath;
 
@@ -54,8 +54,8 @@ namespace Engine
         // Caminho do executável
         auto execPath = std::filesystem::current_path();
 
-        // Sobe até o root do projeto (assumindo estrutura de build)
-        auto projectRoot = execPath.parent_path().parent_path().parent_path();
+        // Sobe até o root do projeto (NEW: 4 níveis para build/src/client/Debug)
+        auto projectRoot = execPath.parent_path().parent_path().parent_path().parent_path();
 
         // Constrói o caminho completo, mas SEM o check de std::filesystem::exists
         auto fullPath = projectRoot / relativePath;
