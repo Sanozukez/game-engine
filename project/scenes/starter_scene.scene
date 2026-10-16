@@ -5,3 +5,15 @@ ground_center: 0,0,0
 player_spawn: 0,1,0
 npc_spawn: 12,1,6
 terrain_source: project/terrains/default_terrain
+sky.procedural_enabled: 1
+sky.sun_yaw_deg: 35
+sky.sun_pitch_deg: 22
+sky.cloud_speed: 0.0035
+sky.cloud_direction_deg: 18
+sky.cloud_coverage: 0.54
+sky.cloud_softness: 0.08
+sky.cloud_scale: 1.75
+sky.cloud_opacity: 0.72
+sky.zenith_color: 0.2,0.39,0.7
+sky.horizon_color: 0.7,0.78,0.9
+sky.cloud_color: 0.92,0.93,0.95

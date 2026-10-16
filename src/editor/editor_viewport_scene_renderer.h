@@ -13,6 +13,22 @@
 
 namespace Editor::ViewportSceneRenderer {
 
+struct SkyRenderParams {
+    bool proceduralEnabled = true;
+    float timeSeconds = 0.0f;
+    float sunYawDeg = 35.0f;
+    float sunPitchDeg = 22.0f;
+    float cloudSpeed = 0.0035f;
+    float cloudDirectionDeg = 18.0f;
+    float cloudCoverage = 0.54f;
+    float cloudSoftness = 0.08f;
+    float cloudScale = 1.75f;
+    float cloudOpacity = 0.72f;
+    glm::vec3 zenithColor = glm::vec3(0.20f, 0.39f, 0.70f);
+    glm::vec3 horizonColor = glm::vec3(0.70f, 0.78f, 0.90f);
+    glm::vec3 cloudColor = glm::vec3(0.92f, 0.93f, 0.95f);
+};
+
 inline GLuint CreateSceneShader() {
     const char* vertexShaderSource = R"(
         #version 330 core
@@ -56,6 +72,190 @@ inline GLuint CreateSceneShader() {
     return program;
 }
 
+inline GLuint CreateSkyShader() {
+    const char* vertexShaderSource = R"(
+        #version 330 core
+        layout(location = 0) in vec2 aPos;
+        out vec2 vUv;
+        void main() {
+            vUv = aPos * 0.5 + 0.5;
+            gl_Position = vec4(aPos, 0.0, 1.0);
+        }
+    )";
+
+    const char* fragmentShaderSource = R"(
+        #version 330 core
+        in vec2 vUv;
+        out vec4 FragColor;
+
+        uniform mat4 uInverseView;
+        uniform mat4 uInverseProjection;
+        uniform vec3 uSunDir;
+        uniform vec3 uZenithColor;
+        uniform vec3 uHorizonColor;
+        uniform vec3 uCloudColor;
+        uniform float uTime;
+        uniform float uCloudSpeed;
+        uniform float uCloudDirectionRad;
+        uniform float uCloudCoverage;
+        uniform float uCloudSoftness;
+        uniform float uCloudScale;
+        uniform float uCloudOpacity;
+
+        float hash12(vec2 p) {
+            vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+            p3 += dot(p3, p3.yzx + 33.33);
+            return fract((p3.x + p3.y) * p3.z);
+        }
+
+        float valueNoise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+
+            float a = hash12(i + vec2(0.0, 0.0));
+            float b = hash12(i + vec2(1.0, 0.0));
+            float c = hash12(i + vec2(0.0, 1.0));
+            float d = hash12(i + vec2(1.0, 1.0));
+
+            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
+
+        float fbm(vec2 p) {
+            float sum = 0.0;
+            float amp = 0.5;
+            float freq = 1.0;
+            for (int i = 0; i < 5; ++i) {
+                sum += valueNoise(p * freq) * amp;
+                freq *= 2.02;
+                amp *= 0.52;
+            }
+            return sum;
+        }
+
+        void main() {
+            vec2 ndc = vUv * 2.0 - 1.0;
+            vec4 clip = vec4(ndc, 1.0, 1.0);
+            vec4 viewPos = uInverseProjection * clip;
+            viewPos /= max(viewPos.w, 0.0001);
+            vec3 dir = normalize((uInverseView * vec4(viewPos.xyz, 0.0)).xyz);
+
+            float horizon = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
+            float t = pow(horizon, 1.25);
+            vec3 sky = mix(uHorizonColor, uZenithColor, t);
+
+            float downTint = smoothstep(0.06, -0.18, dir.y);
+            sky = mix(sky, uHorizonColor * 0.48, downTint);
+
+            float sunAmount = max(dot(normalize(uSunDir), dir), 0.0);
+            vec3 sunGlow = vec3(1.0, 0.78, 0.52) * pow(sunAmount, 84.0) * 0.9;
+            vec3 sunHalo = vec3(1.0, 0.63, 0.34) * pow(sunAmount, 18.0) * 0.35;
+
+            vec2 windDir = vec2(cos(uCloudDirectionRad), sin(uCloudDirectionRad));
+            vec2 cloudUV = dir.xz / max(dir.y + 0.34, 0.17);
+            cloudUV *= uCloudScale;
+            cloudUV += windDir * (uTime * uCloudSpeed);
+
+            float largeShape = fbm(cloudUV * 0.72);
+            float detailShape = fbm(cloudUV * 1.90 + vec2(9.2, -4.3));
+            float n = mix(largeShape, detailShape, 0.38);
+
+            float threshold = mix(0.66, 0.38, clamp(uCloudCoverage, 0.0, 1.0));
+            float softness = max(uCloudSoftness, 0.01);
+            float cloudMask = smoothstep(threshold - softness, threshold + softness, n);
+            cloudMask *= smoothstep(-0.08, 0.20, dir.y);
+
+            // Stylized cutout cloud look for classic MMORPG art direction.
+            float stylizedMask = smoothstep(0.42, 0.58, cloudMask);
+            vec3 color = sky + sunGlow + sunHalo;
+            color = mix(color, uCloudColor, stylizedMask * clamp(uCloudOpacity, 0.0, 1.0));
+
+            FragColor = vec4(color, 1.0);
+        }
+    )";
+
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
+    glCompileShader(vertexShader);
+
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
+    glCompileShader(fragmentShader);
+
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
+    glLinkProgram(program);
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+    return program;
+}
+
+inline void RenderProceduralSky(
+    const glm::mat4& projection,
+    const glm::mat4& view,
+    const SkyRenderParams& skyParams) {
+    static GLuint skyProgram = 0;
+    static GLuint skyVao = 0;
+    static GLuint skyVbo = 0;
+
+    if (skyProgram == 0) {
+        skyProgram = CreateSkyShader();
+
+        const float fullscreenTri[6] = {
+            -1.0f, -1.0f,
+             3.0f, -1.0f,
+            -1.0f,  3.0f
+        };
+
+        glGenVertexArrays(1, &skyVao);
+        glGenBuffers(1, &skyVbo);
+        glBindVertexArray(skyVao);
+        glBindBuffer(GL_ARRAY_BUFFER, skyVbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(fullscreenTri), fullscreenTri, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+        glBindVertexArray(0);
+    }
+
+    const float yawRad = glm::radians(skyParams.sunYawDeg);
+    const float pitchRad = glm::radians(skyParams.sunPitchDeg);
+    const glm::vec3 sunDir = glm::normalize(glm::vec3(
+        std::cos(pitchRad) * std::sin(yawRad),
+        std::sin(pitchRad),
+        -std::cos(pitchRad) * std::cos(yawRad)));
+
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+
+    glUseProgram(skyProgram);
+    const glm::mat4 inverseView = glm::inverse(view);
+    const glm::mat4 inverseProjection = glm::inverse(projection);
+
+    glUniformMatrix4fv(glGetUniformLocation(skyProgram, "uInverseView"), 1, GL_FALSE, &inverseView[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(skyProgram, "uInverseProjection"), 1, GL_FALSE, &inverseProjection[0][0]);
+    glUniform3fv(glGetUniformLocation(skyProgram, "uSunDir"), 1, &sunDir[0]);
+    glUniform3fv(glGetUniformLocation(skyProgram, "uZenithColor"), 1, &skyParams.zenithColor[0]);
+    glUniform3fv(glGetUniformLocation(skyProgram, "uHorizonColor"), 1, &skyParams.horizonColor[0]);
+    glUniform3fv(glGetUniformLocation(skyProgram, "uCloudColor"), 1, &skyParams.cloudColor[0]);
+    glUniform1f(glGetUniformLocation(skyProgram, "uTime"), skyParams.timeSeconds);
+    glUniform1f(glGetUniformLocation(skyProgram, "uCloudSpeed"), skyParams.cloudSpeed);
+    glUniform1f(glGetUniformLocation(skyProgram, "uCloudDirectionRad"), glm::radians(skyParams.cloudDirectionDeg));
+    glUniform1f(glGetUniformLocation(skyProgram, "uCloudCoverage"), skyParams.cloudCoverage);
+    glUniform1f(glGetUniformLocation(skyProgram, "uCloudSoftness"), skyParams.cloudSoftness);
+    glUniform1f(glGetUniformLocation(skyProgram, "uCloudScale"), skyParams.cloudScale);
+    glUniform1f(glGetUniformLocation(skyProgram, "uCloudOpacity"), skyParams.cloudOpacity);
+
+    glBindVertexArray(skyVao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    glUseProgram(0);
+
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+}
+
 inline void RenderSimpleScene3D(
     int width,
     int height,
@@ -63,6 +263,7 @@ inline void RenderSimpleScene3D(
     float pitch,
     float distance,
     const glm::vec3& target,
+    const SkyRenderParams& skyParams,
     const std::string& selectedObject,
     const std::unordered_map<std::string, glm::vec3>& objectPositions,
     const std::unordered_map<std::string, glm::vec3>& objectScales) {
@@ -174,9 +375,16 @@ inline void RenderSimpleScene3D(
     glm::mat4 view = ViewportInteractionUtils::BuildSceneView(yaw, pitch, distance, target);
     glm::mat4 model = glm::mat4(1.0f);
 
-    glClearColor(0.247f, 0.247f, 0.247f, 1.0f); // #3F3F3F (Blender-like)
+    if (skyParams.proceduralEnabled) {
+        glClear(GL_COLOR_BUFFER_BIT);
+        RenderProceduralSky(projection, view, skyParams);
+    } else {
+        glClearColor(0.247f, 0.247f, 0.247f, 1.0f); // #3F3F3F (Blender-like)
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+
     glEnable(GL_DEPTH_TEST);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_DEPTH_BUFFER_BIT);
 
     glDisable(GL_CULL_FACE);
 

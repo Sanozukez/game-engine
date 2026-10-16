@@ -41,6 +41,7 @@ namespace {
     using Editor::ViewportMath::IntersectRayWithPlane;
     using Editor::ViewportMath::ProjectToScreen;
     using Editor::ViewportSceneRenderer::RenderSimpleScene3D;
+    using Editor::ViewportSceneRenderer::SkyRenderParams;
 }
 
 void EditorApp::renderViewport() {
@@ -163,6 +164,20 @@ void EditorApp::renderViewport() {
 
                 glBindFramebuffer(GL_FRAMEBUFFER, m_sceneFramebuffer);
                 glViewport(0, 0, m_sceneFramebufferWidth, m_sceneFramebufferHeight);
+                SkyRenderParams skyParams;
+                skyParams.proceduralEnabled = m_sky.proceduralEnabled;
+                skyParams.timeSeconds = static_cast<float>(ImGui::GetTime());
+                skyParams.sunYawDeg = m_sky.sunYawDeg;
+                skyParams.sunPitchDeg = m_sky.sunPitchDeg;
+                skyParams.cloudSpeed = m_sky.cloudSpeed;
+                skyParams.cloudDirectionDeg = m_sky.cloudDirectionDeg;
+                skyParams.cloudCoverage = m_sky.cloudCoverage;
+                skyParams.cloudSoftness = m_sky.cloudSoftness;
+                skyParams.cloudScale = m_sky.cloudScale;
+                skyParams.cloudOpacity = m_sky.cloudOpacity;
+                skyParams.zenithColor = m_sky.zenithColor;
+                skyParams.horizonColor = m_sky.horizonColor;
+                skyParams.cloudColor = m_sky.cloudColor;
                 RenderSimpleScene3D(
                     m_sceneFramebufferWidth,
                     m_sceneFramebufferHeight,
@@ -170,6 +185,7 @@ void EditorApp::renderViewport() {
                     m_viewport.cameraPitch,
                     m_viewport.cameraDistance,
                     m_viewport.focus,
+                    skyParams,
                     m_selectedObject,
                     m_objectPositions,
                     m_objectScales);

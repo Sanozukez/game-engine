@@ -22,10 +22,32 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
+#include <vector>
+#include <algorithm>
+#include <cctype>
 
 namespace {
     constexpr const char* kEditorTitle = "Game Engine Editor v0.1";
+
+    std::string TrimCopy(const std::string& value) {
+        auto begin = value.begin();
+        while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin))) {
+            ++begin;
+        }
+
+        auto end = value.end();
+        while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1)))) {
+            --end;
+        }
+
+        return std::string(begin, end);
+    }
+
+    bool StartsWith(const std::string& value, const std::string& prefix) {
+        return value.rfind(prefix, 0) == 0;
+    }
 }
 
 EditorApp::EditorApp() {
@@ -122,6 +144,7 @@ void EditorApp::ensureProjectStructure() {
     std::filesystem::create_directories(projectRoot / "scenes");
     std::filesystem::create_directories(projectRoot / "terrains");
     std::filesystem::create_directories(projectRoot / "assets");
+    std::filesystem::create_directories(projectRoot / "assets" / "sky");
     std::filesystem::create_directories(projectRoot / "config");
 
     const std::filesystem::path settingsFile = projectRoot / "config" / "project_settings.json";
@@ -159,7 +182,19 @@ void EditorApp::ensureProjectStructure() {
                 << "ground_center: 0,0,0\n"
                 << "player_spawn: 0,1,0\n"
                 << "npc_spawn: 12,1,6\n"
-                << "terrain_source: project/terrains/default_terrain\n";
+                << "terrain_source: project/terrains/default_terrain\n"
+                << "sky.procedural_enabled: 1\n"
+                << "sky.sun_yaw_deg: 35.0\n"
+                << "sky.sun_pitch_deg: 22.0\n"
+                << "sky.cloud_speed: 0.0035\n"
+                << "sky.cloud_direction_deg: 18.0\n"
+                << "sky.cloud_coverage: 0.54\n"
+                << "sky.cloud_softness: 0.08\n"
+                << "sky.cloud_scale: 1.75\n"
+                << "sky.cloud_opacity: 0.72\n"
+                << "sky.zenith_color: 0.20,0.39,0.70\n"
+                << "sky.horizon_color: 0.70,0.78,0.90\n"
+                << "sky.cloud_color: 0.92,0.93,0.95\n";
             out.close();
         }
     }
@@ -172,9 +207,11 @@ void EditorApp::loadSceneDefinition() {
     const std::filesystem::path projectRoot = std::filesystem::current_path() / m_projectRootPath;
     const std::filesystem::path terrainPath = projectRoot / "terrains" / "default_terrain.mmap";
     const std::filesystem::path fallbackPath = std::filesystem::current_path() / "assets" / "models" / "test_scene_1.mmap";
+    const std::filesystem::path sceneFilePath = projectRoot / "scenes" / "starter_scene.scene";
 
     if (std::filesystem::exists(terrainPath)) {
         m_sceneAssetPath = "project/terrains/default_terrain.mmap";
+        m_sceneDefinitionPath = "project/scenes/starter_scene.scene";
         m_sceneLoaded = true;
         m_terrainReady = true;
         m_isEmptyScene = false;
@@ -182,6 +219,7 @@ void EditorApp::loadSceneDefinition() {
         std::strncpy(m_sceneNameBuffer, m_sceneName.c_str(), sizeof(m_sceneNameBuffer));
         m_sceneNameBuffer[sizeof(m_sceneNameBuffer) - 1] = '\0';
         m_selectedObject = "Wall";
+        loadSkySettingsFromSceneFile(sceneFilePath);
         Engine::Core::Log::Info(std::string("[Editor] Cena carregada a partir do projeto: ") + terrainPath.string());
         return;
     }
@@ -204,6 +242,7 @@ void EditorApp::loadSceneDefinition() {
 
 void EditorApp::loadStarterScene() {
     m_sceneAssetPath = "project/terrains/default_terrain.mmap";
+    m_sceneDefinitionPath = "project/scenes/starter_scene.scene";
     m_sceneLoaded = false;
     m_terrainReady = false;
     m_isEmptyScene = true;
@@ -211,6 +250,7 @@ void EditorApp::loadStarterScene() {
     std::strncpy(m_sceneNameBuffer, m_sceneName.c_str(), sizeof(m_sceneNameBuffer));
     m_sceneNameBuffer[sizeof(m_sceneNameBuffer) - 1] = '\0';
     m_selectedObject = "Wall";
+    loadSkySettingsFromSceneFile(std::filesystem::current_path() / m_sceneDefinitionPath);
     Engine::Core::Log::Warn("[Editor] Nenhuma cena pronta foi encontrada. Iniciando cena mínima padrão do projeto.");
 }
 
@@ -277,6 +317,138 @@ void EditorApp::pickTerrainFromFileBrowser() {
 #else
     Engine::Core::Log::Warn("[Editor] File browser de terreno suportado apenas no Windows.");
 #endif
+}
+
+void EditorApp::loadSkySettingsFromSceneFile(const std::filesystem::path& sceneFilePath) {
+    std::ifstream in(sceneFilePath);
+    if (!in.is_open()) {
+        Engine::Core::Log::Warn(std::string("[Editor] Nao foi possivel abrir arquivo de cena para carregar sky: ") + sceneFilePath.string());
+        return;
+    }
+
+    auto parseFloat = [](const std::string& value, float fallback) -> float {
+        try {
+            return std::stof(TrimCopy(value));
+        } catch (...) {
+            return fallback;
+        }
+    };
+
+    auto parseBool = [](const std::string& value, bool fallback) -> bool {
+        const std::string normalized = TrimCopy(value);
+        if (normalized == "1" || normalized == "true" || normalized == "TRUE") {
+            return true;
+        }
+        if (normalized == "0" || normalized == "false" || normalized == "FALSE") {
+            return false;
+        }
+        return fallback;
+    };
+
+    auto parseColor3 = [&](const std::string& value, const glm::vec3& fallback) -> glm::vec3 {
+        std::stringstream ss(value);
+        std::string chunk;
+        std::vector<float> channels;
+        while (std::getline(ss, chunk, ',')) {
+            channels.push_back(parseFloat(chunk, 0.0f));
+        }
+        if (channels.size() != 3) {
+            return fallback;
+        }
+        return glm::vec3(channels[0], channels[1], channels[2]);
+    };
+
+    std::string line;
+    while (std::getline(in, line)) {
+        const std::string trimmed = TrimCopy(line);
+        if (trimmed.empty() || trimmed[0] == '#') {
+            continue;
+        }
+
+        const std::size_t separatorPos = trimmed.find(':');
+        if (separatorPos == std::string::npos) {
+            continue;
+        }
+
+        const std::string key = TrimCopy(trimmed.substr(0, separatorPos));
+        const std::string value = TrimCopy(trimmed.substr(separatorPos + 1));
+
+        if (key == "sky.procedural_enabled") {
+            m_sky.proceduralEnabled = parseBool(value, m_sky.proceduralEnabled);
+        } else if (key == "sky.sun_yaw_deg") {
+            m_sky.sunYawDeg = parseFloat(value, m_sky.sunYawDeg);
+        } else if (key == "sky.sun_pitch_deg") {
+            m_sky.sunPitchDeg = parseFloat(value, m_sky.sunPitchDeg);
+        } else if (key == "sky.cloud_speed") {
+            m_sky.cloudSpeed = parseFloat(value, m_sky.cloudSpeed);
+        } else if (key == "sky.cloud_direction_deg") {
+            m_sky.cloudDirectionDeg = parseFloat(value, m_sky.cloudDirectionDeg);
+        } else if (key == "sky.cloud_coverage") {
+            m_sky.cloudCoverage = parseFloat(value, m_sky.cloudCoverage);
+        } else if (key == "sky.cloud_softness") {
+            m_sky.cloudSoftness = parseFloat(value, m_sky.cloudSoftness);
+        } else if (key == "sky.cloud_scale") {
+            m_sky.cloudScale = parseFloat(value, m_sky.cloudScale);
+        } else if (key == "sky.cloud_opacity") {
+            m_sky.cloudOpacity = parseFloat(value, m_sky.cloudOpacity);
+        } else if (key == "sky.zenith_color") {
+            m_sky.zenithColor = parseColor3(value, m_sky.zenithColor);
+        } else if (key == "sky.horizon_color") {
+            m_sky.horizonColor = parseColor3(value, m_sky.horizonColor);
+        } else if (key == "sky.cloud_color") {
+            m_sky.cloudColor = parseColor3(value, m_sky.cloudColor);
+        }
+    }
+
+    Engine::Core::Log::Info(std::string("[Editor] Sky carregado da cena: ") + sceneFilePath.string());
+}
+
+void EditorApp::saveSkySettingsToSceneFile(const std::filesystem::path& sceneFilePath) const {
+    std::vector<std::string> preservedLines;
+
+    {
+        std::ifstream in(sceneFilePath);
+        if (in.is_open()) {
+            std::string line;
+            while (std::getline(in, line)) {
+                const std::string trimmed = TrimCopy(line);
+                if (StartsWith(trimmed, "sky.")) {
+                    continue;
+                }
+                preservedLines.push_back(line);
+            }
+        }
+    }
+
+    const std::filesystem::path parentPath = sceneFilePath.parent_path();
+    if (!parentPath.empty()) {
+        std::filesystem::create_directories(parentPath);
+    }
+
+    std::ofstream out(sceneFilePath, std::ios::trunc);
+    if (!out.is_open()) {
+        Engine::Core::Log::Error(std::string("[Editor] Falha ao salvar sky no arquivo de cena: ") + sceneFilePath.string());
+        return;
+    }
+
+    for (const std::string& line : preservedLines) {
+        out << line << "\n";
+    }
+
+    out << "sky.procedural_enabled: " << (m_sky.proceduralEnabled ? 1 : 0) << "\n";
+    out << "sky.sun_yaw_deg: " << m_sky.sunYawDeg << "\n";
+    out << "sky.sun_pitch_deg: " << m_sky.sunPitchDeg << "\n";
+    out << "sky.cloud_speed: " << m_sky.cloudSpeed << "\n";
+    out << "sky.cloud_direction_deg: " << m_sky.cloudDirectionDeg << "\n";
+    out << "sky.cloud_coverage: " << m_sky.cloudCoverage << "\n";
+    out << "sky.cloud_softness: " << m_sky.cloudSoftness << "\n";
+    out << "sky.cloud_scale: " << m_sky.cloudScale << "\n";
+    out << "sky.cloud_opacity: " << m_sky.cloudOpacity << "\n";
+    out << "sky.zenith_color: " << m_sky.zenithColor.r << "," << m_sky.zenithColor.g << "," << m_sky.zenithColor.b << "\n";
+    out << "sky.horizon_color: " << m_sky.horizonColor.r << "," << m_sky.horizonColor.g << "," << m_sky.horizonColor.b << "\n";
+    out << "sky.cloud_color: " << m_sky.cloudColor.r << "," << m_sky.cloudColor.g << "," << m_sky.cloudColor.b << "\n";
+
+    Engine::Core::Log::Info(std::string("[Editor] Sky salvo no arquivo de cena: ") + sceneFilePath.string());
 }
 
 bool EditorApp::createRenderTexture(unsigned int& textureId, unsigned int& framebufferId, unsigned int& depthId, int width, int height) {
