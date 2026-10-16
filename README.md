@@ -187,6 +187,43 @@ Lista de emoji
 
 ## Quando a compilação passar, o comando para rodar é:
 
+### Atualização oficial (2026-10) - manter compatível entre PCs
+
+Observação: manter este bloco como referência oficial. As anotações antigas abaixo continuam válidas como histórico.
+
+1) Ir para a raiz do repositório
+
+```powershell
+cd M:\Dev\game-engine
+```
+
+2) Configurar com CMake (versão instalada em `C:\Program Files\CMake\bin\cmake.exe`)
+
+```powershell
+& "C:\Program Files\CMake\bin\cmake.exe" -S . -B build -G "Visual Studio 17 2022"
+```
+
+3) Build do jogo e do editor
+
+```powershell
+& "C:\Program Files\CMake\bin\cmake.exe" --build build --config Debug --target game-engine
+& "C:\Program Files\CMake\bin\cmake.exe" --build build --config Debug --target game-engine-editor
+```
+
+4) Execução
+
+```powershell
+.\build\src\client\Debug\game-engine.exe
+.\build\src\client\Debug\game-engine-editor.exe
+```
+
+5) Se abrir o VsDevShell e ele mudar para C:, volte para a raiz antes de compilar
+
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
+cd M:\Dev\game-engine
+```
+
 
 # Abrir ambiente do Visual Studio 2022
 
@@ -204,6 +241,8 @@ Lista de emoji
 # Editor
 
 & "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build --config Debug --target game-engine-editor
+
+& "C:\Program Files\CMake\bin\cmake.exe" --build build --config Debug --target game-engine-editor
 .\build\src\client\Debug\game-engine-editor.exe
 
 

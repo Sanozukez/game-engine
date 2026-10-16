@@ -9,6 +9,8 @@
 
 #include <glm/glm.hpp>
 
+#include "editor_theme.h"
+
 namespace Engine {
     class Window;
 }
@@ -33,9 +35,17 @@ private:
     void renderViewport();
     void renderHierarchy();
     void renderInspector();
+    void renderInspectorSelectionSummary();
+    void renderInspectorTransformSection();
+    void renderInspectorRendererSection();
+    void renderInspectorPhysicsSection();
+    void renderInspectorRuntimeSection();
     void renderConsole();
     void renderToolbar();
     void renderSceneSettings();
+    void renderSceneSettingsLoadActions();
+    void renderSceneSettingsOptions();
+    void renderSceneSettingsSummary() const;
     void resetLayout();
     bool createRenderTexture(unsigned int& textureId, unsigned int& framebufferId, unsigned int& depthId, int width, int height);
     void ensureSceneFramebuffer();
@@ -44,6 +54,22 @@ private:
     void loadStarterScene();
     void importTerrainIntoProject();
     void pickTerrainFromFileBrowser();
+
+    struct ViewportState {
+        float cameraYaw = 0.85f;
+        float cameraPitch = 0.42f;
+        float cameraDistance = 14.0f;
+        glm::vec3 focus = glm::vec3(0.0f, 1.0f, 0.0f);
+        std::string transformMode = "None";
+        std::string gizmoSelectedAxis = "None";
+        bool grabMovePending = false;
+        bool grabMoveActive = false;
+        std::string grabAxisLock = "None";
+        glm::vec3 grabStartObjectPos = glm::vec3(0.0f);
+        glm::vec3 grabPlaneOrigin = glm::vec3(0.0f);
+        glm::vec3 grabPlaneNormal = glm::vec3(0.0f, 0.0f, 1.0f);
+        glm::vec3 grabStartHitPoint = glm::vec3(0.0f);
+    };
 
     // Estado visual do editor
     std::unique_ptr<Engine::Window> m_window;
@@ -62,14 +88,7 @@ private:
     int m_sceneFramebufferWidth = 0;
     int m_sceneFramebufferHeight = 0;
     float m_scale = 1.0f;
-    float m_cameraYaw = 0.85f;
-    float m_cameraPitch = 0.42f;
-    float m_cameraDistance = 14.0f;
-    float m_sceneFocusX = 0.0f;
-    float m_sceneFocusY = 1.0f;
-    float m_sceneFocusZ = 0.0f;
-    std::string m_transformMode = "None";
-    std::string m_gizmoSelectedAxis = "None";
+    ViewportState m_viewport;
     std::unordered_map<std::string, glm::vec3> m_objectPositions = {
         {"Wall", glm::vec3(0.0f, 1.5f, -2.0f)},
         {"Player Spawn", glm::vec3(-4.0f, 1.3f, 0.0f)},
@@ -97,4 +116,6 @@ private:
     bool m_scenePhysicsEnabled = true;
     bool m_sceneNavmeshEnabled = true;
     bool m_sceneAudioEnabled = true;
+    EditorVisualStyle m_visualStyle = EditorVisualStyle::Blender;
+    bool m_themeDirty = false;
 };

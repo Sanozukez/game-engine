@@ -63,6 +63,9 @@ add_custom_command(TARGET game-engine POST_BUILD
 add_executable(game-engine-editor
     ../editor/editor_main.cpp
     ../editor/editor_app.cpp
+    ../editor/editor_ui_panels.cpp
+    ../editor/editor_viewport_panel.cpp
+    ../editor/editor_side_panels.cpp
     ../editor/editor_app.h
     ../editor/editor_theme.cpp
     ../editor/editor_theme.h

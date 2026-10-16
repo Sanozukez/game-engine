@@ -2,4 +2,9 @@
 
 struct ImGuiStyle;
 
-void ApplyEditorTheme(ImGuiStyle& style);
+enum class EditorVisualStyle {
+	Blender,
+	FLStudio
+};
+
+void ApplyEditorTheme(ImGuiStyle& style, EditorVisualStyle visualStyle);
