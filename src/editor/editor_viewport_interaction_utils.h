@@ -99,7 +99,8 @@ inline std::string PickObjectByRay(
     const glm::vec3& rayOrigin,
     const glm::vec3& rayDirection,
     const std::unordered_map<std::string, glm::vec3>& objectPositions,
-    const std::unordered_map<std::string, glm::vec3>& objectScales) {
+    const std::unordered_map<std::string, glm::vec3>& objectScales,
+    const std::unordered_map<std::string, glm::vec3>& objectRotationsDeg) {
     std::string bestNonGroundHit = "";
     float bestNonGroundDistance = std::numeric_limits<float>::infinity();
 
@@ -110,14 +111,25 @@ inline std::string PickObjectByRay(
 
         constexpr float kPickPadding = 0.15f;
         const auto scaleIt = objectScales.find(name);
+        const auto rotIt = objectRotationsDeg.find(name);
         const glm::vec3 visualScale = scaleIt != objectScales.end() ? scaleIt->second : glm::vec3(1.0f);
+        const glm::vec3 rotationDeg = rotIt != objectRotationsDeg.end() ? rotIt->second : glm::vec3(0.0f);
         glm::vec3 half = OverlayUtils::GetVisualHalfExtent(visualScale);
         half += glm::vec3(kPickPadding);
-        const glm::vec3 minBounds = position - half;
-        const glm::vec3 maxBounds = position + half;
+
+        glm::mat4 rot = glm::rotate(glm::mat4(1.0f), glm::radians(rotationDeg.y), glm::vec3(0.0f, 1.0f, 0.0f));
+        rot = glm::rotate(rot, glm::radians(rotationDeg.x), glm::vec3(1.0f, 0.0f, 0.0f));
+        rot = glm::rotate(rot, glm::radians(rotationDeg.z), glm::vec3(0.0f, 0.0f, 1.0f));
+        const glm::mat3 invRot = glm::transpose(glm::mat3(rot));
+
+        const glm::vec3 localRayOrigin = invRot * (rayOrigin - position);
+        const glm::vec3 localRayDir = invRot * rayDirection;
+
+        const glm::vec3 minBounds = -half;
+        const glm::vec3 maxBounds = half;
         float distance = 0.0f;
 
-        if (RayIntersectsAABB(rayOrigin, rayDirection, minBounds, maxBounds, distance)) {
+        if (RayIntersectsAABB(localRayOrigin, localRayDir, minBounds, maxBounds, distance)) {
             if (distance < bestNonGroundDistance) {
                 bestNonGroundDistance = distance;
                 bestNonGroundHit = name;

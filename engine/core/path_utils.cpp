@@ -9,22 +9,40 @@
 namespace Engine
 { // **** NOVO: NAMESPACE ENGINE ****
 
+    namespace {
+
+    std::filesystem::path findExistingPathFromCurrent(const std::string &relativePath)
+    {
+        std::filesystem::path probe = std::filesystem::current_path();
+        for (int depth = 0; depth < 8; ++depth)
+        {
+            const std::filesystem::path candidate = probe / relativePath;
+            if (std::filesystem::exists(candidate))
+            {
+                return candidate;
+            }
+
+            const std::filesystem::path parent = probe.parent_path();
+            if (parent == probe || parent.empty())
+            {
+                break;
+            }
+            probe = parent;
+        }
+
+        return {};
+    }
+
+    } // namespace
+
     std::filesystem::path resolveEnginePath(const std::string &relativePath)
     {
-        // Caminho do executável
-        auto execPath = std::filesystem::current_path();
+        const std::filesystem::path fullPath = findExistingPathFromCurrent(relativePath);
 
-        // Sobe até o root do projeto
-        // OLD: build/src/Debug -> 3 níveis
-        // NEW: build/src/client/Debug -> 4 níveis
-        auto projectRoot = execPath.parent_path().parent_path().parent_path().parent_path();
-
-        auto fullPath = projectRoot / relativePath;
-
-        if (!std::filesystem::exists(fullPath))
+        if (fullPath.empty())
         {
-            Engine::Core::Log::Error(std::format("PathUtils: Arquivo não encontrado: {}", fullPath.string()));
-            throw std::runtime_error("Arquivo não encontrado: " + fullPath.string());
+            Engine::Core::Log::Error(std::format("PathUtils: Arquivo não encontrado para '{}', cwd='{}'", relativePath, std::filesystem::current_path().string()));
+            throw std::runtime_error("Arquivo não encontrado: " + relativePath);
         }
 
         return fullPath;
@@ -51,16 +69,24 @@ namespace Engine
 
     std::filesystem::path resolveEnginePathForWrite(const std::string &relativePath)
     {
-        // Caminho do executável
-        auto execPath = std::filesystem::current_path();
+        std::filesystem::path probe = std::filesystem::current_path();
+        for (int depth = 0; depth < 8; ++depth)
+        {
+            const std::filesystem::path configCandidate = probe / "config" / "engine_settings.json";
+            if (std::filesystem::exists(configCandidate))
+            {
+                return probe / relativePath;
+            }
 
-        // Sobe até o root do projeto (NEW: 4 níveis para build/src/client/Debug)
-        auto projectRoot = execPath.parent_path().parent_path().parent_path().parent_path();
+            const std::filesystem::path parent = probe.parent_path();
+            if (parent == probe || parent.empty())
+            {
+                break;
+            }
+            probe = parent;
+        }
 
-        // Constrói o caminho completo, mas SEM o check de std::filesystem::exists
-        auto fullPath = projectRoot / relativePath;
-
-        return fullPath;
+        return std::filesystem::current_path() / relativePath;
     }
 
 } // namespace Engine

@@ -6,6 +6,35 @@
 ## Project Overview
 Modular C++ game engine for 2.5D/3D games (Rohan/MU Online style). Uses OpenGL with GLFW + GLAD + GLM. Architecture follows Single Responsibility Principle (SRP) with strict modularization.
 
+## Reuse-First Architecture Policy (Editor/Client/Server)
+Treat the editor as a tooling layer, not as the final home of gameplay/domain logic.
+
+Mandatory rules:
+- If a feature is reusable by game runtime or server (streaming, world partition, coordinate rules, scene contracts, validation, simulation helpers), implement it in shared engine modules first.
+- Keep editor code as adapters/UI orchestration only (ImGui panels, editor workflows, debug visualization).
+- Avoid editor-only implementations of systems that belong to final runtime architecture.
+- Enforce SRP and decoupling: no UI/platform dependencies inside shared domain modules.
+- Favor small composable modules over large monolithic files.
+
+Placement guidance:
+- Shared domain/runtime logic: `engine/`
+- Editor adapters and tools: `src/editor/`
+- Client/server integration: `src/client/` and `src/server/` consuming `engine/` APIs
+
+Definition of done for new systems:
+1. Core logic implemented in `engine/` with clear API boundaries.
+2. Editor integration implemented via adapter layer (no business logic leakage).
+3. Path is ready for runtime client/server adoption without rewrite.
+
+## Mandatory Pre-Implementation Audit
+Before implementing any new feature:
+1. Search the repository for existing or partial implementations (active code and backup folders).
+2. Identify current runtime flow that must not break.
+3. Prefer extending/refactoring existing modules instead of parallel reimplementation.
+4. Only create new modules after confirming there is no reusable base.
+
+Goal: prevent regressions and logic conflicts when evolving the engine/editor toward final runtime architecture.
+
 **C++ Standard**: C++20 (requires `std::format`, `std::source_location`)
 **Graphics API**: OpenGL 3.3 Core
 **Build System**: CMake 3.25+

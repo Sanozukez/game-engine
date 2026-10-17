@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
 
 #include "editor_viewport_math.h"
@@ -23,18 +24,28 @@ inline void DrawProjectedVisibleBoxOutline(
     const glm::vec3& cameraPosition,
     const glm::vec3& center,
     const glm::vec3& halfExtent,
+    const glm::vec3& rotationDeg,
     ImU32 color,
     float thickness) {
-    const glm::vec3 corners[8] = {
-        center + glm::vec3(-halfExtent.x, -halfExtent.y, -halfExtent.z),
-        center + glm::vec3(halfExtent.x, -halfExtent.y, -halfExtent.z),
-        center + glm::vec3(halfExtent.x, halfExtent.y, -halfExtent.z),
-        center + glm::vec3(-halfExtent.x, halfExtent.y, -halfExtent.z),
-        center + glm::vec3(-halfExtent.x, -halfExtent.y, halfExtent.z),
-        center + glm::vec3(halfExtent.x, -halfExtent.y, halfExtent.z),
-        center + glm::vec3(halfExtent.x, halfExtent.y, halfExtent.z),
-        center + glm::vec3(-halfExtent.x, halfExtent.y, halfExtent.z)
+    glm::mat4 rot = glm::rotate(glm::mat4(1.0f), glm::radians(rotationDeg.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    rot = glm::rotate(rot, glm::radians(rotationDeg.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    rot = glm::rotate(rot, glm::radians(rotationDeg.z), glm::vec3(0.0f, 0.0f, 1.0f));
+    const glm::mat3 rot3(rot);
+
+    const glm::vec3 localCorners[8] = {
+        glm::vec3(-halfExtent.x, -halfExtent.y, -halfExtent.z),
+        glm::vec3(halfExtent.x, -halfExtent.y, -halfExtent.z),
+        glm::vec3(halfExtent.x, halfExtent.y, -halfExtent.z),
+        glm::vec3(-halfExtent.x, halfExtent.y, -halfExtent.z),
+        glm::vec3(-halfExtent.x, -halfExtent.y, halfExtent.z),
+        glm::vec3(halfExtent.x, -halfExtent.y, halfExtent.z),
+        glm::vec3(halfExtent.x, halfExtent.y, halfExtent.z),
+        glm::vec3(-halfExtent.x, halfExtent.y, halfExtent.z)
     };
+    glm::vec3 corners[8];
+    for (int i = 0; i < 8; ++i) {
+        corners[i] = center + rot3 * localCorners[i];
+    }
 
     const int faces[6][4] = {
         {0, 1, 2, 3}, // back  (z-)
@@ -46,12 +57,12 @@ inline void DrawProjectedVisibleBoxOutline(
     };
 
     const glm::vec3 faceNormals[6] = {
-        glm::vec3(0.0f, 0.0f, -1.0f),
-        glm::vec3(0.0f, 0.0f, 1.0f),
-        glm::vec3(-1.0f, 0.0f, 0.0f),
-        glm::vec3(1.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        glm::vec3(0.0f, -1.0f, 0.0f)
+        rot3 * glm::vec3(0.0f, 0.0f, -1.0f),
+        rot3 * glm::vec3(0.0f, 0.0f, 1.0f),
+        rot3 * glm::vec3(-1.0f, 0.0f, 0.0f),
+        rot3 * glm::vec3(1.0f, 0.0f, 0.0f),
+        rot3 * glm::vec3(0.0f, 1.0f, 0.0f),
+        rot3 * glm::vec3(0.0f, -1.0f, 0.0f)
     };
 
     bool faceVisible[6] = {};

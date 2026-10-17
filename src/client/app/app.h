@@ -24,6 +24,11 @@ namespace Engine {
     namespace ECS {
         class World; 
     }
+
+    namespace WorldPartition {
+        class ChunkStreamCoordinator;
+        class NoopChunkStreamBackend;
+    }
 } 
 
 // Forward declaration necessário para a função de setup
@@ -40,4 +45,6 @@ private:
     std::unique_ptr<Engine::Render::Renderer> m_renderer; 
     std::unique_ptr<Engine::ECS::World> m_gameWorld;
     std::unique_ptr<Engine::Camera::ICamera> m_mainCamera; 
+    std::unique_ptr<Engine::WorldPartition::NoopChunkStreamBackend> m_chunkStreamBackend;
+    std::unique_ptr<Engine::WorldPartition::ChunkStreamCoordinator> m_chunkStreamCoordinator;
 };

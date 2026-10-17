@@ -198,6 +198,7 @@ struct LightData
 // Dados para a Seção: SCENE_SECTION_TERRAIN_DATA (TYPE_TERRAIN_BASE)
 // Esta struct é pequena, mas crucial para o streaming futuro
 #define MAX_MESH_NAME_LENGTH 64
+#define MAX_TERRAIN_NORMALIZATION_MODE_LENGTH 32
 
 struct TerrainMetaData
 {
@@ -205,6 +206,23 @@ struct TerrainMetaData
     uint32_t detail_mesh_id;    // ID de referência para a malha de grama/folhagem
     float uv_scale;             // Escala da textura do terreno (para evitar repetição visual)
     char internal_mesh_name[MAX_MESH_NAME_LENGTH];  
+};
+
+// Dados para a Seção: SCENE_SECTION_TERRAIN_DATA (snapshot completo de perfil + amostras)
+struct TerrainHeightmapDataHeader
+{
+    uint32_t width;                    // Largura do heightmap
+    uint32_t height;                   // Altura do heightmap
+    uint16_t bit_depth;                // Profundidade por amostra (ex: 16)
+    uint16_t sample_format;            // 1 = unsigned integer
+    float min_height_m;                // Faixa global de altura minima
+    float max_height_m;                // Faixa global de altura maxima
+    float zero_level_m;                // Nivel de referencia
+    uint16_t source_min_raw;           // Menor sample raw de origem
+    uint16_t source_max_raw;           // Maior sample raw de origem
+    uint32_t sample_count;             // Total de amostras (width * height)
+    uint64_t samples_offset;           // Offset absoluto no arquivo para o primeiro sample
+    char normalization_mode[MAX_TERRAIN_NORMALIZATION_MODE_LENGTH];
 };
 
 struct SceneNode

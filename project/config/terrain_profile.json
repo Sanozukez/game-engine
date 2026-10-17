@@ -1,0 +1,16 @@
+{
+    "terrain_profile": {
+        "min_height_m": -200.0,
+        "max_height_m": 1800.0,
+        "zero_level_m": 0.0,
+        "bit_depth": 16,
+        "normalization_mode": "global_range_linear"
+    },
+    "world_grid": {
+        "macro_columns": 4,
+        "macro_rows": 8,
+        "chunks_per_macro_side": 4,
+        "chunk_size_m": 250.0,
+        "clamp_to_defined_grid": true
+    }
+}

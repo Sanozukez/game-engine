@@ -34,6 +34,7 @@
   },
   "world": {
     "start_map_path": "assets/models/test_scene_1.mmap",
+    "terrain_profile_path": "project/config/terrain_profile.json",
     "terrain_raycast_height": 200.0,
     "gravity": [
       0.0,

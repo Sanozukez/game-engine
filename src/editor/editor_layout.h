@@ -7,7 +7,7 @@ namespace EditorLayout {
     constexpr float kToolbarHeight = 48.0f;
     constexpr float kLeftPanelWidth = 270.0f;
     constexpr float kRightPanelWidth = 310.0f;
-    constexpr float kBottomPanelHeight = 180.0f;
+    constexpr float kBottomPanelHeight = 300.0f;
     constexpr float kStatusBarHeight = 26.0f;
 
     void ComputePanelRects(

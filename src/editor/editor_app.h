@@ -12,6 +12,8 @@
 #include <glm/glm.hpp>
 
 #include "editor_theme.h"
+#include "editor_world_partition_adapter.h"
+#include "world_partition/terrain_profile.h"
 
 namespace Engine {
     class Window;
@@ -34,14 +36,20 @@ private:
     void renderMenuBar();
     void renderStatusBar();
     void renderMainContent();
+    void renderDockSpaceHost();
+    void rebuildDefaultDockLayout();
     void renderViewport();
+    void renderWorldEditorTab();
     void renderHierarchy();
+    void renderActorPalette();
+    void renderSkyPanel();
     void renderInspector();
     void renderInspectorSelectionSummary();
     void renderInspectorTransformSection();
     void renderInspectorRendererSection();
     void renderInspectorPhysicsSection();
     void renderInspectorRuntimeSection();
+    void renderContentBrowser();
     void renderConsole();
     void renderToolbar();
     void renderSceneSettings();
@@ -49,17 +57,45 @@ private:
     void renderSceneSettingsOptions();
     void renderSceneSettingsSky();
     void renderSkyAssetBrowser();
+    void renderSceneAssetPipelineTools();
+    void renderAssetPipelinePanel();
     void renderSceneSettingsSummary() const;
     void resetLayout();
     bool createRenderTexture(unsigned int& textureId, unsigned int& framebufferId, unsigned int& depthId, int width, int height);
-    void ensureSceneFramebuffer();
+    void ensureSceneFramebuffer(int targetWidth, int targetHeight);
     void ensureProjectStructure();
+    bool rebuildSceneObjectsFromCurrentMap();
     void loadSceneDefinition();
     void loadStarterScene();
     void importTerrainIntoProject();
     void pickTerrainFromFileBrowser();
+    void pickAndImportAssetFromFileBrowser();
+    void importAssetFileToProject(const std::filesystem::path& sourceFile);
+    void saveAllEditorChanges();
+    void buildDictionaryCompiler();
+    void runDictionaryCompiler();
+    void buildMmapCompiler();
+    void runMmapCompilerFromSource();
+    void pickMmapSourceGlbFromFileBrowser();
+    void runMmapImportAndCompilePipeline();
+    bool copyFileToProjectModels(const std::filesystem::path& sourceFile, std::filesystem::path& importedFileOut);
+    bool copyGeneratedMmapToProjectTerrains(const std::filesystem::path& generatedMmapPath, std::filesystem::path& copiedMmapOut);
+    void setAssetPipelineStatus(const std::string& statusMessage);
+    void ensureProjectAssetFolders();
     void loadSkySettingsFromSceneFile(const std::filesystem::path& sceneFilePath);
     void saveSkySettingsToSceneFile(const std::filesystem::path& sceneFilePath) const;
+    void updateWorldPartitionFromCamera(const glm::vec3& cameraWorldPosition);
+    std::string getActiveChunkLabel() const;
+    int getLoadedChunkCount() const;
+    bool isObjectVisibleInActiveChunk(const std::string& objectId) const;
+    float terrainMinHeightMeters() const;
+    float terrainMaxHeightMeters() const;
+    float terrainZeroLevelMeters() const;
+    int terrainHeightBitDepth() const;
+    std::string terrainNormalizationMode() const;
+    bool doesChunkHaveCompiledMap(int chunkX, int chunkZ) const;
+    bool setActiveChunkScene(int chunkX, int chunkZ);
+    void importChunkMapForCell(int chunkX, int chunkZ);
 
     struct ViewportState {
         float cameraYaw = 0.85f;
@@ -75,6 +111,16 @@ private:
         glm::vec3 grabPlaneOrigin = glm::vec3(0.0f);
         glm::vec3 grabPlaneNormal = glm::vec3(0.0f, 0.0f, 1.0f);
         glm::vec3 grabStartHitPoint = glm::vec3(0.0f);
+
+        bool rotateActive = false;
+        glm::vec3 rotateStartEulerDeg = glm::vec3(0.0f);
+        glm::vec2 rotateStartMouse = glm::vec2(0.0f);
+        std::string rotateAxisLock = "Y";
+
+        bool scaleActive = false;
+        glm::vec3 scaleStartValue = glm::vec3(1.0f);
+        glm::vec2 scaleStartMouse = glm::vec2(0.0f);
+        std::string scaleAxisLock = "Uniform";
     };
 
     struct SkySettings {
@@ -100,9 +146,14 @@ private:
     bool m_showInspector = true;
     bool m_showConsole = true;
     bool m_showToolbar = true;
+    bool m_showActorPalette = true;
+    bool m_showSkyPanel = true;
     bool m_showViewport = true;
     bool m_showGizmoDebug = true;
-    bool m_layoutLocked = true;
+    bool m_showAssetPipeline = true;
+    bool m_showContentBrowser = true;
+    bool m_dockLayoutInitialized = false;
+    bool m_resetDockLayoutRequested = true;
     unsigned int m_sceneFramebuffer = 0;
     unsigned int m_sceneColorTexture = 0;
     unsigned int m_sceneDepthRenderbuffer = 0;
@@ -123,13 +174,32 @@ private:
         {"NPC Spawn", glm::vec3(0.7f, 1.0f, 0.7f)},
         {"Ground", glm::vec3(12.0f, 0.1f, 12.0f)}
     };
+    std::unordered_map<std::string, glm::vec3> m_objectRotationsDeg = {
+        {"Wall", glm::vec3(0.0f)},
+        {"Player Spawn", glm::vec3(0.0f)},
+        {"NPC Spawn", glm::vec3(0.0f)},
+        {"Ground", glm::vec3(0.0f)}
+    };
+    Editor::EditorWorldPartitionAdapter m_worldPartition;
+    Engine::WorldPartition::TerrainProfile m_terrainProfile;
     bool m_isInitialized = false;
     std::string m_selectedObject = "Ground";
     std::string m_sceneName = "StarterScene";
     std::string m_sceneAssetPath = "project/terrains";
     std::string m_sceneDefinitionPath = "project/scenes/starter_scene.scene";
     std::string m_projectRootPath = "project";
+    std::string m_activeSkyProfilePath;
     char m_skyProfileNameBuffer[64] = "rohan_soft_day";
+    char m_outlinerFilterBuffer[64] = "";
+    char m_contentFilterBuffer[96] = "";
+    char m_newContentFolderBuffer[64] = "new_folder";
+    char m_mmapSourceGlbPathBuffer[260] = "assets/models/test_scene_1.glb";
+    std::string m_assetPipelineStatus = "Idle";
+    std::string m_contentBrowserStatus = "Ready";
+    std::string m_worldEditorStatus = "Ready";
+    std::string m_contentBrowserCurrentRoot = "project/assets";
+    int m_worldEditorSelectedChunkX = 0;
+    int m_worldEditorSelectedChunkZ = 0;
     bool m_sceneLoaded = false;
     bool m_terrainReady = false;
     bool m_isEmptyScene = true;

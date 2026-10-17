@@ -14,6 +14,7 @@
 #include <imgui.h>
 
 #include <cmath>
+#include <algorithm>
 #include <format>
 #include <string>
 #include <utility>
@@ -45,24 +46,17 @@ namespace {
 }
 
 void EditorApp::renderViewport() {
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    const Editor::PanelLayoutUtils::PanelRects panelRects = Editor::PanelLayoutUtils::ComputePanelRects(viewport);
-
-    if (m_layoutLocked) {
-        ImGui::SetNextWindowPos(ImVec2(panelRects.viewportX, panelRects.viewportY));
-        ImGui::SetNextWindowSize(ImVec2(panelRects.viewportW, panelRects.viewportH));
-    }
-
     ImGuiWindowFlags viewportFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar;
-    if (m_layoutLocked) {
-        viewportFlags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-    }
 
     ImGui::Begin("Viewport", nullptr, viewportFlags);
 
     ImGui::BeginTabBar("ViewportTabs", ImGuiTabBarFlags_NoCloseWithMiddleMouseButton | ImGuiTabBarFlags_FittingPolicyScroll);
     if (ImGui::BeginTabItem("Scene")) {
         ImVec2 size = ImGui::GetContentRegionAvail();
+        const int targetFramebufferWidth = static_cast<int>(size.x > 1.0f ? size.x : 1.0f);
+        const int targetFramebufferHeight = static_cast<int>(size.y > 1.0f ? size.y : 1.0f);
+        ensureSceneFramebuffer(targetFramebufferWidth, targetFramebufferHeight);
+
         const float canvasWidth = (size.x + 300.0f > 900.0f) ? (size.x + 300.0f) : 900.0f;
         const float canvasHeight = (size.y + 40.0f > 520.0f) ? (size.y + 40.0f) : 520.0f;
         const ImVec2 canvasSize = ImVec2(canvasWidth, canvasHeight);
@@ -70,7 +64,6 @@ void EditorApp::renderViewport() {
         ImGui::BeginChild("SceneCanvas", ImVec2(size.x, size.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
         if (m_sceneFramebufferWidth > 0 && m_sceneFramebufferHeight > 0) {
-            ensureSceneFramebuffer();
             const float previewWidth = (size.x > 1.0f) ? size.x : 1.0f;
             const float previewHeight = (size.y > 1.0f) ? size.y : 1.0f;
             const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
@@ -85,13 +78,39 @@ void EditorApp::renderViewport() {
                             m_viewport.grabMovePending = true;
                             m_viewport.grabMoveActive = false;
                             m_viewport.grabAxisLock = "None";
+                            m_viewport.rotateActive = false;
+                            m_viewport.scaleActive = false;
                         }
                     }
                     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-                        m_viewport.transformMode = "Rotate";
+                        if (!m_selectedObject.empty() && m_selectedObject != "Ground") {
+                            auto rotIt = m_objectRotationsDeg.find(m_selectedObject);
+                            if (rotIt != m_objectRotationsDeg.end()) {
+                                m_viewport.transformMode = "Rotate";
+                                m_viewport.rotateActive = true;
+                                m_viewport.rotateStartEulerDeg = rotIt->second;
+                                m_viewport.rotateStartMouse = glm::vec2(ImGui::GetMousePos().x, ImGui::GetMousePos().y);
+                                m_viewport.rotateAxisLock = "Y";
+                                m_viewport.grabMovePending = false;
+                                m_viewport.grabMoveActive = false;
+                                m_viewport.scaleActive = false;
+                            }
+                        }
                     }
                     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-                        m_viewport.transformMode = "Scale";
+                        if (!m_selectedObject.empty() && m_selectedObject != "Ground") {
+                            auto scaleIt = m_objectScales.find(m_selectedObject);
+                            if (scaleIt != m_objectScales.end()) {
+                                m_viewport.transformMode = "Scale";
+                                m_viewport.scaleActive = true;
+                                m_viewport.scaleStartValue = scaleIt->second;
+                                m_viewport.scaleStartMouse = glm::vec2(ImGui::GetMousePos().x, ImGui::GetMousePos().y);
+                                m_viewport.scaleAxisLock = "Uniform";
+                                m_viewport.grabMovePending = false;
+                                m_viewport.grabMoveActive = false;
+                                m_viewport.rotateActive = false;
+                            }
+                        }
                     }
                     if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
                         if (m_viewport.grabMoveActive) {
@@ -100,21 +119,67 @@ void EditorApp::renderViewport() {
                                 it->second = m_viewport.grabStartObjectPos;
                             }
                         }
+                        if (m_viewport.rotateActive) {
+                            auto it = m_objectRotationsDeg.find(m_selectedObject);
+                            if (it != m_objectRotationsDeg.end()) {
+                                it->second = m_viewport.rotateStartEulerDeg;
+                            }
+                        }
+                        if (m_viewport.scaleActive) {
+                            auto it = m_objectScales.find(m_selectedObject);
+                            if (it != m_objectScales.end()) {
+                                it->second = m_viewport.scaleStartValue;
+                            }
+                        }
                         m_viewport.transformMode = "None";
                         m_viewport.grabMovePending = false;
                         m_viewport.grabMoveActive = false;
                         m_viewport.grabAxisLock = "None";
+                        m_viewport.rotateActive = false;
+                        m_viewport.scaleActive = false;
+                        m_viewport.rotateAxisLock = "Y";
+                        m_viewport.scaleAxisLock = "Uniform";
                     }
 
-                    if (m_viewport.transformMode == "Move" && (m_viewport.grabMovePending || m_viewport.grabMoveActive)) {
+                    const bool moveMode = (m_viewport.transformMode == "Move" && (m_viewport.grabMovePending || m_viewport.grabMoveActive));
+                    const bool rotateMode = (m_viewport.transformMode == "Rotate" && m_viewport.rotateActive);
+                    const bool scaleMode = (m_viewport.transformMode == "Scale" && m_viewport.scaleActive);
+                    if (moveMode || rotateMode || scaleMode) {
                         if (ImGui::IsKeyPressed(ImGuiKey_X)) {
-                            m_viewport.grabAxisLock = "X";
+                            if (moveMode) {
+                                m_viewport.grabAxisLock = "X";
+                            }
+                            if (rotateMode) {
+                                m_viewport.rotateAxisLock = "X";
+                            }
+                            if (scaleMode) {
+                                m_viewport.scaleAxisLock = "X";
+                            }
                         }
                         if (ImGui::IsKeyPressed(ImGuiKey_Y)) {
-                            m_viewport.grabAxisLock = "Y";
+                            if (moveMode) {
+                                m_viewport.grabAxisLock = "Y";
+                            }
+                            if (rotateMode) {
+                                m_viewport.rotateAxisLock = "Y";
+                            }
+                            if (scaleMode) {
+                                m_viewport.scaleAxisLock = "Y";
+                            }
                         }
                         if (ImGui::IsKeyPressed(ImGuiKey_Z)) {
-                            m_viewport.grabAxisLock = "Z";
+                            if (moveMode) {
+                                m_viewport.grabAxisLock = "Z";
+                            }
+                            if (rotateMode) {
+                                m_viewport.rotateAxisLock = "Z";
+                            }
+                            if (scaleMode) {
+                                m_viewport.scaleAxisLock = "Z";
+                            }
+                        }
+                        if (scaleMode && ImGui::IsKeyPressed(ImGuiKey_U)) {
+                            m_viewport.scaleAxisLock = "Uniform";
                         }
                     }
 
@@ -188,11 +253,30 @@ void EditorApp::renderViewport() {
                     skyParams,
                     m_selectedObject,
                     m_objectPositions,
-                    m_objectScales);
+                    m_objectScales,
+                    m_objectRotationsDeg);
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 glViewport(0, 0, m_window->getWidth(), m_window->getHeight());
 
-                ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(m_sceneColorTexture)), ImVec2(previewWidth, previewHeight), ImVec2(0, 1), ImVec2(1, 0));
+                const float textureAspect = static_cast<float>(m_sceneFramebufferWidth) /
+                    static_cast<float>(m_sceneFramebufferHeight > 0 ? m_sceneFramebufferHeight : 1);
+                const float availableAspect = previewWidth / (previewHeight > 0.0f ? previewHeight : 1.0f);
+
+                ImVec2 displaySize = ImVec2(previewWidth, previewHeight);
+                if (availableAspect > textureAspect) {
+                    displaySize.y = previewHeight;
+                    displaySize.x = displaySize.y * textureAspect;
+                } else {
+                    displaySize.x = previewWidth;
+                    displaySize.y = displaySize.x / (textureAspect > 0.0f ? textureAspect : 1.0f);
+                }
+
+                const ImVec2 startCursor = ImGui::GetCursorPos();
+                const float offsetX = (previewWidth - displaySize.x) * 0.5f;
+                const float offsetY = (previewHeight - displaySize.y) * 0.5f;
+                ImGui::SetCursorPos(ImVec2(startCursor.x + offsetX, startCursor.y + offsetY));
+
+                ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(m_sceneColorTexture)), displaySize, ImVec2(0, 1), ImVec2(1, 0));
 
                 if (previewWidth >= 90.0f && previewHeight >= 60.0f) {
                     ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -204,6 +288,7 @@ void EditorApp::renderViewport() {
                         m_viewport.cameraPitch,
                         m_viewport.cameraDistance,
                         m_viewport.focus);
+                    updateWorldPartitionFromCamera(cameraPosition);
                     const glm::mat4 projection = glm::perspective(glm::radians(60.0f), float(m_sceneFramebufferWidth) / float(m_sceneFramebufferHeight > 0 ? m_sceneFramebufferHeight : 1), 0.1f, 100.0f);
                     const glm::mat4 view = BuildSceneView(m_viewport.cameraYaw, m_viewport.cameraPitch, m_viewport.cameraDistance, m_viewport.focus);
                     const ImVec2 imageSize = ImVec2(imageMax.x - imageMin.x, imageMax.y - imageMin.y);
@@ -212,6 +297,10 @@ void EditorApp::renderViewport() {
                         m_viewport.grabMoveActive = false;
                         m_viewport.grabMovePending = false;
                         m_viewport.grabAxisLock = "None";
+                        m_viewport.rotateActive = false;
+                        m_viewport.scaleActive = false;
+                        m_viewport.rotateAxisLock = "Y";
+                        m_viewport.scaleAxisLock = "Uniform";
                         if (clearTransformMode) {
                             m_viewport.transformMode = "None";
                         }
@@ -283,19 +372,79 @@ void EditorApp::renderViewport() {
                             }
                             updateActiveGrab(selectedIt->second, mousePos);
                         }
+
+                        if (m_viewport.transformMode == "Rotate" && m_viewport.rotateActive) {
+                            auto rotIt = m_objectRotationsDeg.find(m_selectedObject);
+                            if (rotIt != m_objectRotationsDeg.end()) {
+                                const ImVec2 mousePos = ImGui::GetMousePos();
+                                const float dx = mousePos.x - m_viewport.rotateStartMouse.x;
+                                const float angleDelta = dx * 0.35f;
+
+                                glm::vec3 euler = m_viewport.rotateStartEulerDeg;
+                                if (m_viewport.rotateAxisLock == "X") {
+                                    euler.x += angleDelta;
+                                } else if (m_viewport.rotateAxisLock == "Z") {
+                                    euler.z += angleDelta;
+                                } else {
+                                    euler.y += angleDelta;
+                                }
+                                rotIt->second = euler;
+
+                                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                                    clearGrabState(true);
+                                } else if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                                    rotIt->second = m_viewport.rotateStartEulerDeg;
+                                    clearGrabState(true);
+                                }
+                            }
+                        }
+
+                        if (m_viewport.transformMode == "Scale" && m_viewport.scaleActive) {
+                            auto scaleIt = m_objectScales.find(m_selectedObject);
+                            if (scaleIt != m_objectScales.end()) {
+                                const ImVec2 mousePos = ImGui::GetMousePos();
+                                const float dx = mousePos.x - m_viewport.scaleStartMouse.x;
+                                const float factor = std::max(0.05f, 1.0f + dx * 0.01f);
+
+                                glm::vec3 scaled = m_viewport.scaleStartValue;
+                                if (m_viewport.scaleAxisLock == "X") {
+                                    scaled.x = std::max(0.05f, m_viewport.scaleStartValue.x * factor);
+                                } else if (m_viewport.scaleAxisLock == "Y") {
+                                    scaled.y = std::max(0.05f, m_viewport.scaleStartValue.y * factor);
+                                } else if (m_viewport.scaleAxisLock == "Z") {
+                                    scaled.z = std::max(0.05f, m_viewport.scaleStartValue.z * factor);
+                                } else {
+                                    scaled = glm::max(glm::vec3(0.05f), m_viewport.scaleStartValue * factor);
+                                }
+
+                                scaleIt->second = scaled;
+
+                                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                                    clearGrabState(true);
+                                } else if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                                    scaleIt->second = m_viewport.scaleStartValue;
+                                    clearGrabState(true);
+                                }
+                            }
+                        }
                     }
 
                     if (!m_selectedObject.empty() && imageSize.x > 1.0f && imageSize.y > 1.0f) {
                         glm::vec3 selectedCenter(0.0f, -0.05f, 0.0f);
                         glm::vec3 selectedHalfExtent(12.0f, 0.05f, 12.0f);
+                        glm::vec3 selectedRotationDeg(0.0f);
 
                         const auto posIt = m_objectPositions.find(m_selectedObject);
                         const auto scaleIt = m_objectScales.find(m_selectedObject);
+                        const auto rotIt = m_objectRotationsDeg.find(m_selectedObject);
                         if (posIt != m_objectPositions.end()) {
                             selectedCenter = posIt->second;
                         }
                         if (scaleIt != m_objectScales.end()) {
                             selectedHalfExtent = GetVisualHalfExtent(scaleIt->second);
+                        }
+                        if (rotIt != m_objectRotationsDeg.end()) {
+                            selectedRotationDeg = rotIt->second;
                         }
 
                         if (m_selectedObject == "Ground") {
@@ -319,6 +468,7 @@ void EditorApp::renderViewport() {
                                 cameraPosition,
                                 selectedCenter,
                                 selectedHalfExtent,
+                                selectedRotationDeg,
                                 IM_COL32(255, 170, 40, 255),
                                 2.8f);
                         }
@@ -386,7 +536,8 @@ void EditorApp::renderViewport() {
                         }
                     }
 
-                    if (!clickedGizmoAxis && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsMouseDragging(ImGuiMouseButton_Middle) && hovered) {
+                    const bool isTransforming = m_viewport.grabMoveActive || m_viewport.rotateActive || m_viewport.scaleActive;
+                    if (!isTransforming && !clickedGizmoAxis && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsMouseDragging(ImGuiMouseButton_Middle) && hovered) {
                         const ImVec2 mousePos = ImGui::GetMousePos();
                         const bool insideImage =
                             mousePos.x >= imageMin.x && mousePos.x <= imageMax.x &&
@@ -396,7 +547,7 @@ void EditorApp::renderViewport() {
                             glm::vec3 rayOrigin;
                             glm::vec3 rayDir;
                             if (BuildMouseRayInImage(mousePos, imageMin, imageMax, view, projection, rayOrigin, rayDir)) {
-                                const std::string picked = PickObjectByRay(rayOrigin, rayDir, m_objectPositions, m_objectScales);
+                                const std::string picked = PickObjectByRay(rayOrigin, rayDir, m_objectPositions, m_objectScales, m_objectRotationsDeg);
                                 if (!picked.empty()) {
                                     m_selectedObject = picked;
                                 }
@@ -409,9 +560,13 @@ void EditorApp::renderViewport() {
                         const std::string selectedText = std::format("Selecionado: {}", m_selectedObject);
                         const std::string transformText = std::format("Transform: {}", m_viewport.transformMode);
                         const std::string axisText = std::format("Gizmo: {}", m_viewport.gizmoSelectedAxis);
+                        const std::string rotateAxisText = std::format("Rotate Axis: {}", m_viewport.rotateAxisLock);
+                        const std::string scaleAxisText = std::format("Scale Axis: {}", m_viewport.scaleAxisLock);
                         DrawOutlinedText(drawList, statusAnchor, IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255), selectedText.c_str());
                         DrawOutlinedText(drawList, ImVec2(statusAnchor.x, statusAnchor.y + 18.0f), IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255), transformText.c_str());
                         DrawOutlinedText(drawList, ImVec2(statusAnchor.x, statusAnchor.y + 36.0f), IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255), axisText.c_str());
+                        DrawOutlinedText(drawList, ImVec2(statusAnchor.x, statusAnchor.y + 54.0f), IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255), rotateAxisText.c_str());
+                        DrawOutlinedText(drawList, ImVec2(statusAnchor.x, statusAnchor.y + 72.0f), IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255), scaleAxisText.c_str());
                         if (!axisSegments.empty()) {
                             for (size_t i = 0; i < axisSegments.size(); ++i) {
                                 const auto& [axisName, segment] = axisSegments[i];
@@ -420,7 +575,7 @@ void EditorApp::renderViewport() {
                                 const float ex = segment.second.x;
                                 const float ey = segment.second.y;
                                 const std::string screenText = std::format("{}: ({:.1f},{:.1f}) -> ({:.1f},{:.1f})", axisName, sx, sy, ex, ey);
-                                DrawOutlinedText(drawList, ImVec2(statusAnchor.x, statusAnchor.y + 54.0f + float(i) * 16.0f), IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255), screenText.c_str());
+                                DrawOutlinedText(drawList, ImVec2(statusAnchor.x, statusAnchor.y + 90.0f + float(i) * 16.0f), IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255), screenText.c_str());
                             }
                         }
                     }
@@ -432,7 +587,6 @@ void EditorApp::renderViewport() {
                 }
             }
         } else {
-            ensureSceneFramebuffer();
             ImGui::Text("Preparing 3D viewport...");
         }
 
@@ -459,9 +613,161 @@ void EditorApp::renderViewport() {
         }
         ImGui::EndTabItem();
     }
+    if (ImGui::BeginTabItem("World Editor")) {
+        renderWorldEditorTab();
+        ImGui::EndTabItem();
+    }
     ImGui::EndTabBar();
 
     ImGui::End();
+}
+
+void EditorApp::renderWorldEditorTab() {
+    const Engine::WorldPartition::WorldGridConfig& gridConfig = m_worldPartition.gridConfig();
+    const int totalChunkColumns = std::max(1, gridConfig.macroColumns * gridConfig.chunksPerMacroSide);
+    const int totalChunkRows = std::max(1, gridConfig.macroRows * gridConfig.chunksPerMacroSide);
+    const int groupSize = 4;
+
+    m_worldEditorSelectedChunkX = std::clamp(m_worldEditorSelectedChunkX, 0, totalChunkColumns - 1);
+    m_worldEditorSelectedChunkZ = std::clamp(m_worldEditorSelectedChunkZ, 0, totalChunkRows - 1);
+
+    ImGui::TextWrapped("Top view do mundo particionado. Clique numa celula para selecionar e importar mapa.");
+    ImGui::Text("Grid real: %d x %d chunks | chunkSize: %.1fm", totalChunkColumns, totalChunkRows, gridConfig.chunkSizeMeters);
+    ImGui::SameLine();
+    if (ImGui::SmallButton("?")) {
+        ImGui::OpenPopup("WorldEditor_TerrainRulesHelp");
+    }
+
+    if (ImGui::BeginPopup("WorldEditor_TerrainRulesHelp")) {
+        const float minH = terrainMinHeightMeters();
+        const float maxH = terrainMaxHeightMeters();
+        const float zeroH = terrainZeroLevelMeters();
+        const int bitDepth = terrainHeightBitDepth();
+        const std::string normMode = terrainNormalizationMode();
+
+        ImGui::TextUnformatted("Regras Globais de Heightmap (usar igual em todas as celulas)");
+        ImGui::Separator();
+        ImGui::BulletText("Min Height: %.1f m", minH);
+        ImGui::BulletText("Max Height: %.1f m", maxH);
+        ImGui::BulletText("Zero Level: %.1f m", zeroH);
+        ImGui::BulletText("Bit Depth: %d-bit", bitDepth);
+        ImGui::BulletText("Normalization: %s", normMode.c_str());
+        ImGui::Separator();
+        ImGui::TextWrapped("Use a mesma faixa vertical para todos os mapas/chunks. Isso evita emenda quebrada entre celulas e evita mismatch entre editor, cliente e servidor.");
+        ImGui::TextWrapped("No Blender/Gaea, configure export com essa faixa global. A diferenca visual entre regioes deve vir da escultura, nao de ranges diferentes por celula.");
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Formula (sample 16-bit -> metros):");
+        ImGui::TextWrapped("h = min + (sample / 65535) * (max - min)");
+        ImGui::TextUnformatted("Formula (metros -> sample 16-bit):");
+        ImGui::TextWrapped("sample = round((h - min) / (max - min) * 65535)");
+        ImGui::Separator();
+        ImGui::TextWrapped("Quando usar range por celula: apenas em casos muito especiais. Dificulta alinhamento de borda, LOD e validacao de gameplay.");
+        ImGui::EndPopup();
+    }
+    ImGui::Separator();
+
+    const bool selectedHasMap = doesChunkHaveCompiledMap(m_worldEditorSelectedChunkX, m_worldEditorSelectedChunkZ);
+    ImGui::Text("Selecionado: chunk_%d_%d", m_worldEditorSelectedChunkX, m_worldEditorSelectedChunkZ);
+    ImGui::SameLine();
+    ImGui::TextColored(selectedHasMap ? ImVec4(0.45f, 0.85f, 0.52f, 1.0f) : ImVec4(0.90f, 0.74f, 0.35f, 1.0f),
+        selectedHasMap ? "(mapa compilado)" : "(vazio)");
+
+    if (ImGui::Button("Importar mapa para celula")) {
+        importChunkMapForCell(m_worldEditorSelectedChunkX, m_worldEditorSelectedChunkZ);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Abrir cena da celula")) {
+        setActiveChunkScene(m_worldEditorSelectedChunkX, m_worldEditorSelectedChunkZ);
+    }
+
+    ImGui::Separator();
+    ImGui::TextWrapped("Legenda: celula escura = possui .mmap compilado. Celula pontilhada = sem mapa. Linha forte = limite de grupo 4x4.");
+
+    const float cellSize = 20.0f;
+    const float cellGap = 3.0f;
+    const float gridWidth = totalChunkColumns * (cellSize + cellGap) + 4.0f;
+    const float gridHeight = totalChunkRows * (cellSize + cellGap) + 4.0f;
+
+    ImGui::BeginChild("WorldGridCanvas", ImVec2(0.0f, 0.0f), true, ImGuiWindowFlags_HorizontalScrollbar);
+    ImVec2 origin = ImGui::GetCursorScreenPos();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    drawList->AddRectFilled(origin, ImVec2(origin.x + gridWidth, origin.y + gridHeight), IM_COL32(20, 22, 24, 255), 6.0f);
+
+    auto drawDottedBorder = [&](const ImVec2& minP, const ImVec2& maxP, ImU32 color) {
+        constexpr float step = 6.0f;
+        constexpr float seg = 3.0f;
+
+        for (float x = minP.x; x < maxP.x; x += step) {
+            drawList->AddLine(ImVec2(x, minP.y), ImVec2(std::min(x + seg, maxP.x), minP.y), color, 1.0f);
+            drawList->AddLine(ImVec2(x, maxP.y), ImVec2(std::min(x + seg, maxP.x), maxP.y), color, 1.0f);
+        }
+        for (float y = minP.y; y < maxP.y; y += step) {
+            drawList->AddLine(ImVec2(minP.x, y), ImVec2(minP.x, std::min(y + seg, maxP.y)), color, 1.0f);
+            drawList->AddLine(ImVec2(maxP.x, y), ImVec2(maxP.x, std::min(y + seg, maxP.y)), color, 1.0f);
+        }
+    };
+
+    for (int z = 0; z < totalChunkRows; ++z) {
+        for (int x = 0; x < totalChunkColumns; ++x) {
+            const float px = origin.x + 2.0f + x * (cellSize + cellGap);
+            const float py = origin.y + 2.0f + z * (cellSize + cellGap);
+            const ImVec2 cellMin(px, py);
+            const ImVec2 cellMax(px + cellSize, py + cellSize);
+            const bool hasMap = doesChunkHaveCompiledMap(x, z);
+            const bool isSelected = (x == m_worldEditorSelectedChunkX && z == m_worldEditorSelectedChunkZ);
+
+            ImU32 fillColor = hasMap ? IM_COL32(52, 64, 76, 255) : IM_COL32(36, 38, 40, 255);
+            if (isSelected) {
+                fillColor = hasMap ? IM_COL32(78, 106, 128, 255) : IM_COL32(98, 86, 58, 255);
+            }
+
+            drawList->AddRectFilled(cellMin, cellMax, fillColor, 2.0f);
+            if (hasMap) {
+                drawList->AddRect(cellMin, cellMax, IM_COL32(120, 150, 178, 255), 2.0f, ImDrawFlags_None, isSelected ? 2.0f : 1.0f);
+            } else {
+                drawDottedBorder(cellMin, cellMax, IM_COL32(118, 118, 118, 255));
+                if (isSelected) {
+                    drawList->AddRect(cellMin, cellMax, IM_COL32(220, 180, 92, 255), 2.0f, ImDrawFlags_None, 2.0f);
+                }
+            }
+
+            ImGui::SetCursorScreenPos(cellMin);
+            ImGui::InvisibleButton(std::format("##chunk_cell_{}_{}", x, z).c_str(), ImVec2(cellSize, cellSize));
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+                m_worldEditorSelectedChunkX = x;
+                m_worldEditorSelectedChunkZ = z;
+                m_worldEditorStatus = std::format("Celula selecionada: chunk_{}_{}", x, z);
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("chunk_%d_%d\nStatus: %s", x, z, hasMap ? "mmap compilado" : "vazio");
+            }
+        }
+    }
+
+    for (int gx = 0; gx <= totalChunkColumns; gx += groupSize) {
+        const float x = origin.x + 2.0f + gx * (cellSize + cellGap) - (cellGap * 0.5f);
+        drawList->AddLine(
+            ImVec2(x, origin.y + 2.0f),
+            ImVec2(x, origin.y + 2.0f + totalChunkRows * (cellSize + cellGap) - cellGap),
+            IM_COL32(186, 128, 64, 230),
+            2.0f);
+    }
+
+    for (int gz = 0; gz <= totalChunkRows; gz += groupSize) {
+        const float y = origin.y + 2.0f + gz * (cellSize + cellGap) - (cellGap * 0.5f);
+        drawList->AddLine(
+            ImVec2(origin.x + 2.0f, y),
+            ImVec2(origin.x + 2.0f + totalChunkColumns * (cellSize + cellGap) - cellGap, y),
+            IM_COL32(186, 128, 64, 230),
+            2.0f);
+    }
+
+    ImGui::Dummy(ImVec2(gridWidth + 8.0f, gridHeight + 8.0f));
+    ImGui::EndChild();
+
+    ImGui::Separator();
+    ImGui::TextWrapped("Status: %s", m_worldEditorStatus.c_str());
 }
 
 

@@ -9,6 +9,7 @@ add_library(engine STATIC)
 # O PUBLIC garante que qualquer outro projeto que use a 'engine' também encontre o header.
 target_include_directories(engine PUBLIC
     ${json_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/math 
     ${CMAKE_CURRENT_SOURCE_DIR}/ecs
     ${CMAKE_CURRENT_SOURCE_DIR}/ecs/components
@@ -31,6 +32,7 @@ add_subdirectory(deps)
 # FÍSICA E ECS (A ORDEM CRÍTICA)
 add_subdirectory(physics) # <--- DEVE VIR ANTES DO ECS (PlayerSystem precisa de rayTriangleIntersect)
 add_subdirectory(ecs)     # <--- ONDE PlayerSystem e RenderSystem são definidos
+add_subdirectory(world_partition)
 
 # se todas as fontes .cpp estão sendo adicionadas pelos subdiretórios
 # (como engine/core/CMakeLists.txt e engine/input/CMakeLists.txt fazem).

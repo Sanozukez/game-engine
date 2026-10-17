@@ -66,11 +66,13 @@ add_executable(game-engine-editor
     ../editor/editor_ui_panels.cpp
     ../editor/editor_viewport_panel.cpp
     ../editor/editor_side_panels.cpp
+    ../editor/editor_world_partition_adapter.cpp
     ../editor/editor_app.h
     ../editor/editor_theme.cpp
     ../editor/editor_theme.h
     ../editor/editor_layout.cpp
     ../editor/editor_layout.h
+    ../editor/editor_world_partition_adapter.h
 )
 
 target_include_directories(game-engine-editor PRIVATE

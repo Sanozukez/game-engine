@@ -15,10 +15,16 @@
 
 // NOVO: Inclui a classe AppSetup, que contém toda a lógica de inicialização
 #include "app_setup.h"
+#include "world_partition/chunk_stream_coordinator.h"
+#include "world_partition/i_chunk_stream_backend.h"
+#include "world_partition/terrain_profile.h"
+#include "ecs/components/player_component.h"
+#include "ecs/components/transform_component.h"
 
 #include <glm/gtx/string_cast.hpp>
 #include <thread>
 #include <chrono>
+#include <filesystem>
 #include <glm/glm.hpp>
 #include <iostream>
 #include <format>
@@ -53,6 +59,22 @@ void App::run()
         Engine::Core::Log::Critical("[App] Falha ao carregar configurações essenciais. Encerrando.");
         return;
     }
+
+    const std::filesystem::path terrainProfilePath =
+        Engine::WorldPartition::ResolveTerrainProfilePath(std::filesystem::current_path());
+    const Engine::WorldPartition::TerrainProfile terrainProfile = Engine::WorldPartition::LoadTerrainProfileFromFile(terrainProfilePath);
+    m_chunkStreamBackend = std::make_unique<Engine::WorldPartition::NoopChunkStreamBackend>();
+    m_chunkStreamCoordinator = std::make_unique<Engine::WorldPartition::ChunkStreamCoordinator>(
+        *m_chunkStreamBackend,
+        terrainProfile.grid);
+    Engine::Core::Log::Info(std::format(
+        "[WorldPartition][Runtime] Terrain profile carregado: minH={} maxH={} grid={}x{} chunksPerMacro={} chunkSize={}m",
+        terrainProfile.minHeightMeters,
+        terrainProfile.maxHeightMeters,
+        terrainProfile.grid.macroColumns,
+        terrainProfile.grid.macroRows,
+        terrainProfile.grid.chunksPerMacroSide,
+        terrainProfile.grid.chunkSizeMeters));
 
     // === INICIALIZAR SISTEMA DE LOG (via JSON) ===
     Engine::Core::LoggerConfig logConfig;
@@ -190,6 +212,28 @@ void App::run()
         {
             PROFILE_SCOPE("World::update"); // <-- PROFILING: Tempo total do ECS
             m_gameWorld->update(deltaTime);
+        }
+
+        if (m_chunkStreamCoordinator && m_mainCamera && m_gameWorld) {
+            glm::vec3 streamSource = m_mainCamera->getPosition();
+            const char* sourceTag = "camera";
+
+            const EntityID playerID = m_gameWorld->getSingleEntityWith<Engine::ECS::Component::Player>();
+            if (playerID != Engine::ECS::INVALID_ENTITY_ID &&
+                m_gameWorld->hasComponent<Engine::ECS::Component::Transform>(playerID)) {
+                streamSource = m_gameWorld->getComponent<Engine::ECS::Component::Transform>(playerID).position.toGLM();
+                sourceTag = "player";
+            }
+
+            const auto streamTick = m_chunkStreamCoordinator->update(streamSource);
+            if (streamTick.activeChunkChanged) {
+                Engine::Core::Log::Info(std::format(
+                    "[WorldPartition][Runtime] Source={} | Active chunk: {} | toLoad={} | toUnload={}",
+                    sourceTag,
+                    Engine::WorldPartition::ToChunkLabel(streamTick.activeChunk),
+                    streamTick.chunksToLoad.size(),
+                    streamTick.chunksToUnload.size()));
+            }
         }
 
         m_window->swapBuffersAndPollEvents();

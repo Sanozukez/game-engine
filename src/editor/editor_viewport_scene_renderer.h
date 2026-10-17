@@ -266,7 +266,8 @@ inline void RenderSimpleScene3D(
     const SkyRenderParams& skyParams,
     const std::string& selectedObject,
     const std::unordered_map<std::string, glm::vec3>& objectPositions,
-    const std::unordered_map<std::string, glm::vec3>& objectScales) {
+    const std::unordered_map<std::string, glm::vec3>& objectScales,
+    const std::unordered_map<std::string, glm::vec3>& objectRotationsDeg) {
     static GLuint program = 0;
     static GLuint gridVao = 0;
     static GLuint gridVbo = 0;
@@ -397,51 +398,38 @@ inline void RenderSimpleScene3D(
     glUniformMatrix4fv(glGetUniformLocation(program, "uModel"), 1, GL_FALSE, &model[0][0]);
     glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(4 * (2 * 120 + 1)));
 
-    const glm::vec3 wallPos = objectPositions.count("Wall") ? objectPositions.at("Wall") : glm::vec3(0.0f, 1.5f, -2.0f);
-    const glm::vec3 wallScale = objectScales.count("Wall") ? objectScales.at("Wall") : glm::vec3(3.0f, 1.5f, 0.6f);
-    const glm::vec3 playerPos = objectPositions.count("Player Spawn") ? objectPositions.at("Player Spawn") : glm::vec3(-4.0f, 1.3f, 0.0f);
-    const glm::vec3 playerScale = objectScales.count("Player Spawn") ? objectScales.at("Player Spawn") : glm::vec3(1.0f, 1.5f, 1.0f);
-    const glm::vec3 npcPos = objectPositions.count("NPC Spawn") ? objectPositions.at("NPC Spawn") : glm::vec3(4.0f, 1.0f, 1.5f);
-    const glm::vec3 npcScale = objectScales.count("NPC Spawn") ? objectScales.at("NPC Spawn") : glm::vec3(0.7f, 1.0f, 0.7f);
-    glm::mat4 wallModel = glm::translate(glm::mat4(1.0f), wallPos) * glm::scale(glm::mat4(1.0f), wallScale);
-    glm::mat4 playerModel = glm::translate(glm::mat4(1.0f), playerPos) * glm::scale(glm::mat4(1.0f), playerScale);
-    glm::mat4 npcModel = glm::translate(glm::mat4(1.0f), npcPos) * glm::scale(glm::mat4(1.0f), npcScale);
+    auto buildModel = [](const glm::vec3& position, const glm::vec3& rotationDeg, const glm::vec3& scaleValue) {
+        glm::mat4 rot = glm::rotate(glm::mat4(1.0f), glm::radians(rotationDeg.y), glm::vec3(0.0f, 1.0f, 0.0f));
+        rot = glm::rotate(rot, glm::radians(rotationDeg.x), glm::vec3(1.0f, 0.0f, 0.0f));
+        rot = glm::rotate(rot, glm::radians(rotationDeg.z), glm::vec3(0.0f, 0.0f, 1.0f));
+        return glm::translate(glm::mat4(1.0f), position) * rot * glm::scale(glm::mat4(1.0f), scaleValue);
+    };
+
+    std::vector<std::string> objectIds;
+    objectIds.reserve(objectPositions.size());
+    for (const auto& kv : objectPositions) {
+        if (kv.first != "Ground") {
+            objectIds.push_back(kv.first);
+        }
+    }
+    std::sort(objectIds.begin(), objectIds.end());
 
     glBindVertexArray(boxVao);
     glUniform3f(glGetUniformLocation(program, "uColor"), 1.0f, 1.0f, 1.0f);
-    glUniformMatrix4fv(glGetUniformLocation(program, "uModel"), 1, GL_FALSE, &wallModel[0][0]);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 12, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 16, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
 
-    glUniformMatrix4fv(glGetUniformLocation(program, "uModel"), 1, GL_FALSE, &playerModel[0][0]);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 12, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 16, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
+    for (const std::string& objectId : objectIds) {
+        const glm::vec3 pos = objectPositions.count(objectId) ? objectPositions.at(objectId) : glm::vec3(0.0f);
+        const glm::vec3 scl = objectScales.count(objectId) ? objectScales.at(objectId) : glm::vec3(1.0f);
+        const glm::vec3 rot = objectRotationsDeg.count(objectId) ? objectRotationsDeg.at(objectId) : glm::vec3(0.0f);
+        const glm::mat4 modelForObject = buildModel(pos, rot, scl);
 
-    glUniformMatrix4fv(glGetUniformLocation(program, "uModel"), 1, GL_FALSE, &npcModel[0][0]);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 12, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 16, 4);
-    glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
-
-    glm::mat4 selectedModel = glm::mat4(1.0f);
-    if (selectedObject == "Wall") {
-        selectedModel = wallModel;
-    } else if (selectedObject == "Player Spawn") {
-        selectedModel = playerModel;
-    } else if (selectedObject == "NPC Spawn") {
-        selectedModel = npcModel;
-    } else if (selectedObject == "Ground") {
-        selectedModel = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.05f, 0.0f)), glm::vec3(12.0f, 0.1f, 12.0f));
+        glUniformMatrix4fv(glGetUniformLocation(program, "uModel"), 1, GL_FALSE, &modelForObject[0][0]);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 12, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 16, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
     }
 
     glBindVertexArray(0);

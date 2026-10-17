@@ -1,0 +1,5 @@
+type: terrain
+name: default_terrain
+size: 50
+origin: 0,0,0
+status: imported_to_project

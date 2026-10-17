@@ -12,3 +12,12 @@ target_include_directories(test_struct_sizes PRIVATE
 
 # Link com engine se necessário (não precisa por enquanto, só usa structs)
 # target_link_libraries(test_struct_sizes engine)
+
+# Teste: Sky serialization/parsing
+add_executable(test_sky_serialization
+    test_sky_serialization.cpp
+)
+
+target_include_directories(test_sky_serialization PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)

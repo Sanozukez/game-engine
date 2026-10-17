@@ -248,6 +248,7 @@ cd M:\Dev\game-engine
 
 
 .\build\Debug\game-engine.exe
+.\build\src\client\Debug\game-engine.exe
 
 cmake -B build
 cmake --build build
